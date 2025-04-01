@@ -42,7 +42,7 @@ def write_request(characteristic: BlessGATTCharacteristic, value: Any, **kwargs)
 async def run(loop):
     trigger.clear()
     # Instantiate the server
-    my_service_name = "Test Service"
+    my_service_name = "Safe-Pi"
     server = BlessServer(name=my_service_name, loop=loop)
     server.read_request_func = read_request
     server.write_request_func = write_request
