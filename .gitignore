@@ -1,5 +1,4 @@
 /.DS_Store
-Bluetooth/ss-venv/
 
 # Logs
 logs
@@ -25,3 +24,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+ssENV/*
