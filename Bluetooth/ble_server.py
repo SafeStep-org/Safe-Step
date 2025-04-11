@@ -36,6 +36,7 @@ class SafePiBLEServer:
             GATTCharacteristicProperties.read
             | GATTCharacteristicProperties.write
             | GATTCharacteristicProperties.indicate
+            | GATTCharacteristicProperties.write_without_response
         )
         permissions = (
             GATTAttributePermissions.readable
