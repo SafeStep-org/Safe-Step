@@ -7,8 +7,8 @@ from libcamera import controls
 
 # Initialize Cameras
 print("Initializing cameras...")
-camera1 = Picamera2()  # First camera (wide-angle or primary)
-camera2 = Picamera2()  # Second camera (secondary)
+camera1 = Picamera2(0)  # First camera (wide-angle or primary)
+camera2 = Picamera2(1)  # Second camera (secondary)
 
 camera1.set_controls({"AfMode": controls.AfModeEnum.Continuous})
 camera2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
