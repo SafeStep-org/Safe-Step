@@ -4,6 +4,7 @@ import torch
 import cv2
 from picamera2 import Picamera2
 from libcamera import controls
+from ultralytics import YOLO
 
 # Initialize Cameras
 print("Initializing cameras...")
@@ -23,8 +24,8 @@ print("Initializing TF-Luna LiDAR...")
 ser = serial.Serial("/dev/ttyAMA0", 115200)
 
 # Load YOLOv5 Model
-print("Loading YOLOv5 model...")
-model = torch.load('yolo11s.pt')
+print("Loading YOLO11s model...")
+model = YOLO("yolo11s.pt")
 
 def read_tfluna_data():
     """Reads distance, signal strength, and temperature from the TF-Luna."""
