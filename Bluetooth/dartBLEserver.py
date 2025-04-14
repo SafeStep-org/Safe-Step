@@ -4,9 +4,9 @@ from bleak.backends.characteristic import GATTCharacteristicProperties
 import random
 
 # Define UUIDs
-SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
-OBJECT_UUID = "12345678-1234-5678-1234-56789abcdef1"
-DIST_UUID = "12345678-1234-5678-1234-56789abcdef2"
+SERVICE_UUID = "302c754d-63c1-4c28-a5ff-ad3e9f332226"
+OBJECT_UUID = "3a98b215-2971-4c6d-b5c2-02597ae99d0e"
+DIST_UUID = "3bce9b52-c356-4afb-becd-c7ee0b52d550"
 
 # Mock data generator
 def get_sensor_data():
