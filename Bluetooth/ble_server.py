@@ -25,8 +25,8 @@ class SafePiBLEServer:
         self.server.read_request_func = self.read_request
         self.server.write_request_func = self.write_request
 
-        self.service_uuid = "A07498CA-AD5B-474E-940D-16F1FBE7E8CD"
-        self.char_uuid = "51FF12BB-3ED8-46E5-B4F9-D64E2FEC021B"
+        self.service_uuid = "302c754d-63c1-4c28-a5ff-ad3e9f332226"
+        self.char_uuid = "3a98b215-2971-4c6d-b5c2-02597ae99d0e"
         self.characteristic: Optional[BlessGATTCharacteristic] = None
 
     async def start(self):
