@@ -24,7 +24,7 @@ async def main():
     while True:
         await asyncio.sleep(5)
         i += 1
-        await server.send_message_to_speak(f"I love you {i}")
+        await server.send_message(f'"speak": "I love you {i}"')
 
 if __name__ == "__main__":
     asyncio.run(main())

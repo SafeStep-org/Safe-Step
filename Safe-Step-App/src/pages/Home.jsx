@@ -11,15 +11,15 @@ function Home() {
       console.log("Connecting to Safe Step...");
 
       const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: ["a07498ca-ad5b-474e-940d-16f1fbe7e8cd"] }],
+        filters: [{ services: ["302c754d-63c1-4c28-a5ff-ad3e9f332226"] }],
       });
 
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService(
-        "a07498ca-ad5b-474e-940d-16f1fbe7e8cd"
+        "302c754d-63c1-4c28-a5ff-ad3e9f332226"
       );
       const characteristic = await service.getCharacteristic(
-        "51ff12bb-3ed8-46e5-b4f9-d64e2fec021b"
+        "3a98b215-2971-4c6d-b5c2-02597ae99d0e"
       );
       console.log(`service: ${service}, characteristic ${characteristic}`);
       setBTCharacteristic(characteristic);
