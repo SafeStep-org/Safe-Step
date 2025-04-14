@@ -6,64 +6,39 @@ function Home() {
   const [messageToSend, setMessageToSend] = useState("");
   const [btConnected, setBTConnected] = useState(false);
 
-  // const connectToSafeStep = async () => {
-  //   try {
-  //     console.log("Connecting to Safe Step...");
-
-  //     const device = await navigator.bluetooth.requestDevice({
-  //       filters: [{ services: ["a07498ca-ad5b-474e-940d-16f1fbe7e8cd"] }],
-  //     });
-
-  //     const server = await device.gatt.connect();
-  //     const service = await server.getPrimaryService(
-  //       "a07498ca-ad5b-474e-940d-16f1fbe7e8cd"
-  //     );
-  //     const characteristic = await service.getCharacteristic(
-  //       "51ff12bb-3ed8-46e5-b4f9-d64e2fec021b"
-  //     );
-  //     console.log(`service: ${service}, characteristic ${characteristic}`);
-  //     setBTCharacteristic(characteristic);
-
-  //     // Start notifications
-  //     await characteristic.startNotifications();
-  //     characteristic.addEventListener(
-  //       "characteristicvaluechanged",
-  //       handleNotification
-  //     );
-
-  //     console.log("Connected and listening for messages.");
-  //     await sendMessage([0x0f]);
-  //     setBTConnected(true);
-  //   } catch (error) {
-  //     console.error("Connection failed", error);
-  //   }
-  // };
-
   const connectToSafeStep = async () => {
     try {
       console.log("Connecting to Safe Step...");
-      
+
       const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: ["A07498CA-AD5B-474E-940D-16F1FBE7E8CD"] }],
+        filters: [{ services: ["a07498ca-ad5b-474e-940d-16f1fbe7e8cd"] }],
       });
-      
+
       const server = await device.gatt.connect();
-      const service = await server.getPrimaryService("A07498CA-AD5B-474E-940D-16F1FBE7E8CD");
-      const characteristic = await service.getCharacteristic("51FF12BB-3ED8-46E5-B4F9-D64E2FEC021B");
-  
+      const service = await server.getPrimaryService(
+        "a07498ca-ad5b-474e-940d-16f1fbe7e8cd"
+      );
+      const characteristic = await service.getCharacteristic(
+        "51ff12bb-3ed8-46e5-b4f9-d64e2fec021b"
+      );
+      console.log(`service: ${service}, characteristic ${characteristic}`);
+      setBTCharacteristic(characteristic);
+
       // Start notifications
       await characteristic.startNotifications();
-      characteristic.addEventListener('characteristicvaluechanged', (event) => {
-        console.log('Received notification:', new TextDecoder().decode(event.target.value));
-      });
-  
-      console.log("Connected and listening for notifications.");
+      characteristic.addEventListener(
+        "characteristicvaluechanged",
+        handleNotification
+      );
+
+      console.log("Connected and listening for messages.");
+      await sendMessage([0x0f]);
+      setBTConnected(true);
     } catch (error) {
       console.error("Connection failed", error);
     }
   };
   
-
   const handleNotification = (event) => {
     const value = event.target.value;
     const decoder = new TextDecoder("utf-8");
