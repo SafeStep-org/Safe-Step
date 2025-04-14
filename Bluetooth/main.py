@@ -20,9 +20,11 @@ async def main():
     await server.send_message("Hi PWA!")
 
     # Wait and send another message every few seconds
+    i = 0
     while True:
         await asyncio.sleep(5)
-        await server.send_message("Ping from BLE server!")
+        i += 1
+        await server.send_message_to_speak(f"I love you {i}")
 
 if __name__ == "__main__":
     asyncio.run(main())
