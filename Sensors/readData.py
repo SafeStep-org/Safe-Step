@@ -79,17 +79,17 @@ try:
         # Run YOLOv5 inference on both images
         print("Running object detection...")
         results1 = model(img1_rgb)  # Inference on Camera 1 image
-        # results2 = model(img2_rgb)  # Inference on Camera 2 image
+        results2 = model(img2_rgb)  # Inference on Camera 2 image
 
         # Print detected objects
         print("Camera 1 Results:")
-        results1.print()  # Prints detected labels, confidence scores, etc.
+        print(results1)  # Prints detected labels, confidence scores, etc.
         
         print("Camera 2 Results:")
-        # results2.print()
+        print(results2)
 
         # Visualize results (optional)
-        results1.show()  # Displays image with bounding boxes
+        # results1.show()  # Displays image with bounding boxes
         # results2.show()
 
         # Read data from TF-Luna LiDAR
