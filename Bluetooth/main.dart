@@ -22,9 +22,9 @@ class SensorScreen extends StatefulWidget {
 
 class _SensorScreenState extends State<SensorScreen> {
   final _ble = FlutterReactiveBle();
-  final serviceUuid = Uuid.parse("12345678-1234-5678-1234-56789abcdef0");
-  final objectUuid = Uuid.parse("12345678-1234-5678-1234-56789abcdef1");
-  final distUuid = Uuid.parse("12345678-1234-5678-1234-56789abcdef2");
+  final serviceUuid = Uuid.parse("302c754d-63c1-4c28-a5ff-ad3e9f332226");
+  final objectUuid = Uuid.parse("3a98b215-2971-4c6d-b5c2-02597ae99d0e");
+  final distUuid = Uuid.parse("3bce9b52-c356-4afb-becd-c7ee0b52d550");
 
   late DiscoveredDevice device;
   String object = "N/A";
