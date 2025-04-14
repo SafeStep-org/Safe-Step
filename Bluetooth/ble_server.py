@@ -76,5 +76,5 @@ class SafePiBLEServer:
             logger.warning("No client connected; message not sent.")
             
     async def send_message_to_speak(self, msg: str):
-        jsonMessage = f'"speak": "{msg}"'
+        jsonMessage = f'{"speak": "{msg}"}'
         await self.send_message(jsonMessage)
