@@ -16,56 +16,44 @@ class BleManager {
   final _connectionStatusController = StreamController<bool>.broadcast();
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
 
+  Function(String message)? onMessageReceived;
+
   Future<void> connectToDevice(BluetoothDevice device) async {
-  if (connectedDevice?.id == device.id) {
-    log("Already connected to ${device.name}");
-    return;
-  }
+    if (connectedDevice?.id == device.id) {
+      log("Already connected to ${device.name}");
+      return;
+    }
 
-  await disconnect();
+    await disconnect();
 
-  try {
-    await device.connect(timeout: const Duration(seconds: 10));
-    connectedDevice = device;
+    try {
+      await device.connect(timeout: const Duration(seconds: 10));
+      connectedDevice = device;
 
-    List<BluetoothService> services = await device.discoverServices();
-    for (var service in services) {
-      if (service.uuid == serviceUuid) {
-        for (var char in service.characteristics) {
-          if (char.uuid == characteristicUuid) {
-            targetCharacteristic = char;
+      List<BluetoothService> services = await device.discoverServices();
+      for (var service in services) {
+        if (service.uuid == serviceUuid) {
+          for (var char in service.characteristics) {
+            if (char.uuid == characteristicUuid) {
+              targetCharacteristic = char;
+              char.setNotifyValue(true);
 
-            if (char.properties.notify) {
-              await char.setNotifyValue(true);
-              char.value.listen(
-                (val) {
-                  log("Notified: $val");
-                },
-                onDone: () {
-                  log("Notification stream closed");
-                },
-              );
+              _connectionStatusController.add(true);
+              await writeData([0x0f]);
+
+              return;
             }
-
-            _connectionStatusController.add(true);
-
-            // 🔹 Send 0x0f to initiate communication
-            await writeData([0x0f]);
-
-            return; // Exit after setup
           }
         }
       }
+       
+      log("Target service/characteristic not found.");
+      _connectionStatusController.add(false);
+    } catch (e) {
+      log("Connection error: $e");
+      _connectionStatusController.add(false);
     }
-
-    log("Target service/characteristic not found.");
-    _connectionStatusController.add(false);
-  } catch (e) {
-    log("Connection error: $e");
-    _connectionStatusController.add(false);
   }
-}
-
 
   Future<void> writeData(List<int> data) async {
     if (targetCharacteristic != null) {
