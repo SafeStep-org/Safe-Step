@@ -45,29 +45,33 @@ class HomeState extends State<Home> {
     });
 
     FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-    FlutterBluePlus.scanResults.listen((results) {
-      for (var result in results) {
-        if (!_scanResults.any((r) => r.device.id == result.device.id) &&
-            result.advertisementData.serviceUuids.contains(targetServiceUuid)) {
+    FlutterBluePlus.scanResults
+        .listen((results) {
+          for (var result in results) {
+            if (!_scanResults.any((r) => r.device.id == result.device.id) &&
+                result.advertisementData.serviceUuids.contains(
+                  targetServiceUuid,
+                )) {
+              setState(() {
+                _scanResults.add(result);
+              });
+            }
+          }
+        })
+        .onDone(() {
           setState(() {
-            _scanResults.add(result);
+            _scanning = false;
           });
-        }
-      }
-    }).onDone(() {
-      setState(() {
-        _scanning = false;
-      });
-    });
+        });
   }
 
   void _connectToDevice(BluetoothDevice device) async {
     log("Attempting connection to ${device.name}");
     await _bleManager.connectToDevice(device);
 
-    _bleManager.targetCharacteristic?.value.listen((value) {
+    _bleManager.targetCharacteristic?.lastValueStream.listen((value) {
       final message = String.fromCharCodes(value);
-      log("Received: $message");
+      log(message);
       setState(() {
         _log.add("Received: $message");
       });
@@ -89,9 +93,12 @@ class HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: _isConnected ? _buildConnectedView() : _buildConnectionPrompt(),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: _isConnected ? _buildConnectedView() : _buildConnectionPrompt(),
+      ),
     );
   }
 
@@ -99,7 +106,7 @@ class HomeState extends State<Home> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Connect to a BLE device", style: TextStyle(fontSize: 20)),
+        const Text("Connect to your Safe Step", style: TextStyle(fontSize: 20)),
         const SizedBox(height: 12),
         _scanning ? const Text("Scanning...") : const SizedBox.shrink(),
         Expanded(
@@ -140,10 +147,7 @@ class HomeState extends State<Home> {
               ),
             ),
             const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _sendMessage,
-              child: const Text("Send"),
-            ),
+            ElevatedButton(onPressed: _sendMessage, child: const Text("Send")),
           ],
         ),
         const SizedBox(height: 20),
