@@ -1,5 +1,3 @@
-# safe_pi_ble_server.py
-
 import sys
 import asyncio
 import threading
@@ -59,16 +57,29 @@ class SafePiBLEServer:
         return characteristic.value
 
     def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
-        message = value.decode('utf-8')
+        # Handle the received data
+        message = value.decode('utf-8', errors='replace')  # Handle encoding errors gracefully
         logger.info(f"Received from client: {message}")
+
+        # If the received message is 0x0f, acknowledge and trigger the connection start
+        if message == '0f':
+            logger.info("Received 0x0f, starting connection.")
+            self.server.update_value(self.service_uuid, self.char_uuid, b"Connection started")
+        else:
+            logger.info(f"Received message: {message}")
+
+        # Optional: You can implement a specific action here to handle the message.
         if self.characteristic:
             self.server.update_value(self.service_uuid, self.char_uuid, b"hello from server")
+
+        # Trigger event to notify about the connection or received message
         if self.trigger.__module__ == "threading":
             self.trigger.set()
         else:
             self.loop.call_soon_threadsafe(self.trigger.set)
 
     async def send_message(self, msg: str):
+        """Send message to the connected client."""
         if self.characteristic:
             self.server.update_value(self.service_uuid, self.char_uuid, msg.encode('utf-8'))
             logger.info(f"Sent to client: {msg}")
