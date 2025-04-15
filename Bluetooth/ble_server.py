@@ -61,16 +61,16 @@ class SafePiBLEServer:
     def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
         message = value.decode('utf-8')
         logger.info(f"Received from client: {message}")
-        if self.characteristic:
-            self.server.update_value(self.service_uuid, self.char_uuid, b"hello from server")
-        if self.trigger.__module__ == "threading":
+        self.characteristic.value = message
+        
+        if self.trigger .__module__ == "threading":
             self.trigger.set()
         else:
             self.loop.call_soon_threadsafe(self.trigger.set)
 
     async def send_message(self, msg: str):
         if self.characteristic:
-            self.server.update_value(self.service_uuid, self.char_uuid, msg.encode('utf-8'))
+            self.characteristic.value = msg.encode('utf-8')
             logger.info(f"Sent to client: {msg}")
         else:
             logger.warning("No client connected; message not sent.")
