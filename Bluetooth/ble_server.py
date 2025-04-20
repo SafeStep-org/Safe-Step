@@ -64,7 +64,7 @@ class SafePiBLEServer:
         logger.info(f"Received from client: {message}")
         
         if(message == 'shutdown'):
-            subprocess.run(["shutdown"])
+            subprocess.run(["shutdown", "now"])
         
         self.characteristic.value = value
         self.server.update_value(self.service_uuid, self.char_uuid)
