@@ -63,7 +63,7 @@ class SafePiBLEServer:
         message = value.decode('utf-8')
         logger.info(f"Received from client: {message}")
         
-        if(value == 'shutdown'):
+        if(message == 'shutdown'):
             subprocess.run(["shutdown"])
         
         self.characteristic.value = value
