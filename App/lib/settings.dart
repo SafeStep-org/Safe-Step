@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 class Settings extends StatelessWidget {
-  const Settings({super.key});
+  Settings({super.key});
+
+  final FlutterTts flutterTts = FlutterTts();
 
   @override
   Widget build(BuildContext context) {

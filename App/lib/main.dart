@@ -1,66 +1,83 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import 'map.dart';
-import 'home.dart';
+import 'ble_manager.dart';
+import 'tts_manager.dart';
+import 'connect.dart';
 import 'settings.dart';
 
 void main() {
-  runApp(MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        Provider<BleManager>.value(
+          value: BleManager(), // your singleton instance
+        ),
+        Provider<TtsManager>.value(
+          value: TtsManager(),
+        ),
+      ],
+      child: const SafeStepApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SafeStepApp extends StatelessWidget {
+  const SafeStepApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Safe Step",
+      title: 'Safe Step',
       theme: ThemeData(
-        primarySwatch: Colors.deepOrange,
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(172, 0, 204, 255))
       ),
-      home: MyHomePage(),
+      home: const MainPage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+class MainPage extends StatefulWidget {
+  const MainPage({super.key});
 
   @override
-  MyHomePageState createState() => MyHomePageState();
+  State<MainPage> createState() => _MainPageState();
 }
 
-class MyHomePageState extends State<MyHomePage> {
-  int _currentIndex = 0;
-  final List<Widget> _screens = [
-    Home(),
-    Map(),
+class _MainPageState extends State<MainPage> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _pages = [
+    Connect(),
     Settings(),
   ];
+
+  void _onTabTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Safe Step'),
-        backgroundColor: Theme.of(context).highlightColor,
+        title: const Text('Safe Step'),
+        backgroundColor: Theme.of(context).primaryColor,
       ),
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: [
+        currentIndex: _selectedIndex,
+        onTap: _onTabTapped,
+        items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
+            icon: Icon(Icons.bluetooth),
+            label: 'Connect',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
@@ -71,4 +88,3 @@ class MyHomePageState extends State<MyHomePage> {
     );
   }
 }
-

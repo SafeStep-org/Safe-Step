@@ -3,17 +3,21 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import 'package:safe_step/tts_manager.dart';
 
 import 'ble_manager.dart';
 
-class Home extends StatefulWidget {
+class Connect extends StatefulWidget {
+  const Connect({super.key});
+
   @override
-  HomeState createState() => HomeState();
+  ConnectState createState() => ConnectState();
 }
 
-class HomeState extends State<Home> {
-  final BleManager _bleManager = BleManager();
-  final Guid targetServiceUuid = BleManager().serviceUuid;
+class ConnectState extends State<Connect> {
+  late BleManager _bleManager;
+  late TtsManager _ttsManager;
   final List<ScanResult> _scanResults = [];
   final List<String> _log = [];
   final TextEditingController _inputController = TextEditingController();
@@ -24,6 +28,8 @@ class HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
+    _bleManager = Provider.of<BleManager>(context, listen: false);
+    _ttsManager = Provider.of<TtsManager>(context, listen: false);
     _requestPermissions();
     _bleManager.connectionStatusStream.listen((connected) {
       setState(() {
@@ -50,7 +56,7 @@ class HomeState extends State<Home> {
           for (var result in results) {
             if (!_scanResults.any((r) => r.device.id == result.device.id) &&
                 result.advertisementData.serviceUuids.contains(
-                  targetServiceUuid,
+                  _bleManager.serviceUuid,
                 )) {
               setState(() {
                 _scanResults.add(result);
@@ -72,6 +78,9 @@ class HomeState extends State<Home> {
     _bleManager.targetCharacteristic?.lastValueStream.listen((value) {
       final message = String.fromCharCodes(value);
       log(message);
+
+      _ttsManager.speak(message);
+
       setState(() {
         _log.add("Received: $message");
       });

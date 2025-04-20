@@ -1,4 +1,4 @@
-name: testapp
+name: "safe_step"
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -37,6 +37,8 @@ dependencies:
   rename_app: ^1.6.2
   flutter_blue_plus: ^1.35.3
   permission_handler: ^12.0.0+1
+  flutter_tts: ^4.2.2
+  provider: ^6.1.4
 
 dev_dependencies:
   flutter_test:

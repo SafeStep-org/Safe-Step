@@ -1,5 +1,5 @@
-# safe_pi_ble_server.py
 
+import subprocess
 import sys
 import asyncio
 import threading
@@ -62,6 +62,9 @@ class SafePiBLEServer:
     def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
         message = value.decode('utf-8')
         logger.info(f"Received from client: {message}")
+        
+        if(value == 'shutdown'):
+            subprocess.run(["shutdown"])
         
         self.characteristic.value = value
         self.server.update_value(self.service_uuid, self.char_uuid)
