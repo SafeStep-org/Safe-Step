@@ -67,7 +67,7 @@ class SafePiBLEServer:
             subprocess.run(["shutdown", "now"])
         
         self.characteristic.value = value
-        self.server.update_value(self.service_uuid, self.char_uuid)
+        logger.info(f"Updated value to ${message}")
         
         if self.trigger .__module__ == "threading":
             self.trigger.set()
