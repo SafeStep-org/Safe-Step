@@ -3,9 +3,10 @@
 <plist version="1.0">
   <dict>
   <key>NSBluetoothAlwaysUsageDescription</key>
-   <string>Need BLE permission</string>
-   <key>NSBluetoothPeripheralUsageDescription</key>
-   <string>Need BLE permission</string>
+<string>App needs Bluetooth access to connect to devices.</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>App uses location for Bluetooth scanning.</string>
+
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
     <key>CFBundleDevelopmentRegion</key>

@@ -18,6 +18,20 @@ class BleManager {
 
   Function(String message)? onMessageReceived;
 
+  Future<void> waitForBluetoothOn() async {
+    await for (final state in FlutterBluePlus.adapterState) {
+      log("Bluetooth adapter state: $state");
+      if (state == BluetoothAdapterState.on) break;
+      await Future.delayed(Duration(milliseconds: 500));
+    }
+  }
+
+  Future<void> tryConnectToDevice(BluetoothDevice device) async {
+    await waitForBluetoothOn();
+    await Future.delayed(Duration(seconds: 1));
+    await connectToDevice(device);
+  }
+
   Future<void> connectToDevice(BluetoothDevice device) async {
     if (connectedDevice?.id == device.id) {
       log("Already connected to ${device.name}");
@@ -36,17 +50,16 @@ class BleManager {
           for (var char in service.characteristics) {
             if (char.uuid == characteristicUuid) {
               targetCharacteristic = char;
-              char.setNotifyValue(true);
+              await char.setNotifyValue(true);
 
               _connectionStatusController.add(true);
               await writeData([0x0f]);
-
               return;
             }
           }
         }
       }
-       
+
       log("Target service/characteristic not found.");
       _connectionStatusController.add(false);
     } catch (e) {

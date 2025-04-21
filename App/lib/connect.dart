@@ -42,13 +42,17 @@ class ConnectState extends State<Connect> {
     await Permission.bluetoothScan.request();
     await Permission.bluetoothConnect.request();
     await Permission.location.request();
-    _startScan();
   }
 
-  void _startScan() {
+  void _startScan() async {
+    if (_scanning || _isConnected) return;
+
     setState(() {
       _scanning = true;
+      _scanResults.clear();
     });
+
+    await _bleManager.waitForBluetoothOn();
 
     FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
     FlutterBluePlus.scanResults
@@ -73,7 +77,7 @@ class ConnectState extends State<Connect> {
 
   void _connectToDevice(BluetoothDevice device) async {
     log("Attempting connection to ${device.name}");
-    await _bleManager.connectToDevice(device);
+    await _bleManager.tryConnectToDevice(device);
 
     _bleManager.targetCharacteristic?.lastValueStream.listen((value) {
       final message = String.fromCharCodes(value);
@@ -117,7 +121,15 @@ class ConnectState extends State<Connect> {
       children: [
         const Text("Connect to your Safe Step", style: TextStyle(fontSize: 20)),
         const SizedBox(height: 12),
-        _scanning ? const Text("Scanning...") : const SizedBox.shrink(),
+
+        // Scan Button (only shows if not connected)
+        if (!_isConnected)
+          ElevatedButton(
+            onPressed: _scanning ? null : _startScan,
+            child: Text(_scanning ? "Scanning..." : "Scan for Devices"),
+          ),
+        const SizedBox(height: 12),
+
         Expanded(
           child: ListView.builder(
             itemCount: _scanResults.length,

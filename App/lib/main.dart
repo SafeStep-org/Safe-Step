@@ -13,7 +13,7 @@ void main() {
     MultiProvider(
       providers: [
         Provider<BleManager>.value(
-          value: BleManager(), // your singleton instance
+          value: BleManager(),
         ),
         Provider<TtsManager>.value(
           value: TtsManager(),
