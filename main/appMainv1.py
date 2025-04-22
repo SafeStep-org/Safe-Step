@@ -1,4 +1,3 @@
-# safe_pi_combined.py
 
 import asyncio
 import serial
@@ -8,7 +7,7 @@ import cv2
 from picamera2 import Picamera2
 from libcamera import controls
 from ultralytics import YOLO
-from ble_server import SafePiBLEServer  # Ensure this module exists
+from ble_server import SafePiBLEServer
 
 # Initialize hardware
 print("Initializing cameras...")

@@ -1,6 +1,6 @@
 # main.py
 import asyncio
-from ble_server import SafePiBLEServer
+from main.ble_server import SafePiBLEServer
 
 async def main():
     loop = asyncio.get_running_loop()

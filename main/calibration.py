@@ -1,13 +1,14 @@
 import cv2
 import numpy as np
 import glob
+import sys
 
-# Settings
-chessboard_size = (9, 6)
-square_size = 0.025  # in meters (2.5 cm)
+
+chessboard_size = (4, 3)
+square_size = 0.075  # in meters (2.5 cm)
 image_format = 'jpg'
+    
 
-# Prepare object points, like (0,0,0), (1,0,0), ..., (8,5,0)
 objp = np.zeros((chessboard_size[0]*chessboard_size[1], 3), np.float32)
 objp[:, :2] = np.mgrid[0:chessboard_size[0], 0:chessboard_size[1]].T.reshape(-1, 2)
 objp *= square_size
