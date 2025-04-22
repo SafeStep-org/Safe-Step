@@ -6,7 +6,7 @@ import sys
 # distance between cameras : 2.5 cm
 
 chessboard_size = (10, 7)
-square_size = 0.013  # in meters (2.5 cm)
+square_size = 0.015  # in meters (2.5 cm)
 image_format = 'jpg'
     
 
