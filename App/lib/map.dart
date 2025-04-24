@@ -34,7 +34,7 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     final OpenRouteService client = OpenRouteService(
-      apiKey: 'YOUR-API-KEY', // Replace with your own or your hosted API
+      apiKey: '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77',
     );
 
     final List<ORSCoordinate> routeCoordinates =
