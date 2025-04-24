@@ -122,7 +122,6 @@ class ConnectState extends State<Connect> {
         const Text("Connect to your Safe Step", style: TextStyle(fontSize: 20)),
         const SizedBox(height: 12),
 
-        // Scan Button (only shows if not connected)
         if (!_isConnected)
           ElevatedButton(
             onPressed: _scanning ? null : _startScan,

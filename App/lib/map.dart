@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -35,15 +36,19 @@ class _MapScreenState extends State<Map> {
 
   Future<void> _initializeLocation() async {
     LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       permission = await Geolocator.requestPermission();
     }
 
     final Position position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
+    if (!mounted) return; // <-- Add this
+
     currentUserLocation = LatLng(position.latitude, position.longitude);
     myPoint = currentUserLocation!;
+
     _startLiveLocationUpdates();
 
     setState(() {
@@ -59,7 +64,11 @@ class _MapScreenState extends State<Map> {
   }
 
   void _startLiveLocationUpdates() {
-    locationUpdateTimer = Timer.periodic(const Duration(seconds: 2), (Timer t) async {
+    locationUpdateTimer = Timer.periodic(const Duration(seconds: 2), (
+      Timer t,
+    ) async {
+      if (!mounted) return;
+
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -74,14 +83,21 @@ class _MapScreenState extends State<Map> {
 
         if (distanceMoved > 5 && markers.length == 2) {
           currentUserLocation = newLocation;
+
           markers[0] = Marker(
             point: newLocation,
             width: 80,
             height: 80,
-            child: Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+            child: const Icon(
+              Icons.accessibility_new,
+              size: 45,
+              color: Colors.blue,
+            ),
           );
 
           await getCoordinates(newLocation, markers[1].point);
+
+          if (!mounted) return;
           setState(() {});
         }
       }
@@ -89,6 +105,8 @@ class _MapScreenState extends State<Map> {
   }
 
   Future<void> getCoordinates(LatLng lat1, LatLng lat2) async {
+    if (!mounted) return;
+
     setState(() {
       isLoading = true;
     });
@@ -97,18 +115,26 @@ class _MapScreenState extends State<Map> {
       apiKey: '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77',
     );
 
-    final List<ORSCoordinate> routeCoordinates =
-        await client.directionsRouteCoordsGet(
-      startCoordinate:
-          ORSCoordinate(latitude: lat1.latitude, longitude: lat1.longitude),
-      endCoordinate:
-          ORSCoordinate(latitude: lat2.latitude, longitude: lat2.longitude),
-      // profile: ORSProfile.footWheelchair,
-    );
+    final List<ORSCoordinate> routeCoordinates = await client
+        .directionsRouteCoordsGet(
+          startCoordinate: ORSCoordinate(
+            latitude: lat1.latitude,
+            longitude: lat1.longitude,
+          ),
+          endCoordinate: ORSCoordinate(
+            latitude: lat2.latitude,
+            longitude: lat2.longitude,
+          ),
+        );
 
-    final List<LatLng> routePoints = routeCoordinates
-        .map((coordinate) => LatLng(coordinate.latitude, coordinate.longitude))
-        .toList();
+    final List<LatLng> routePoints =
+        routeCoordinates
+            .map(
+              (coordinate) => LatLng(coordinate.latitude, coordinate.longitude),
+            )
+            .toList();
+
+    if (!mounted) return;
 
     setState(() {
       points = routePoints;
@@ -131,16 +157,14 @@ class _MapScreenState extends State<Map> {
 
       if (markers.length == 2 && currentUserLocation != null) {
         Future.delayed(const Duration(milliseconds: 300), () {
+          if (!mounted) return;
+
           setState(() {
             isLoading = true;
           });
         });
 
         getCoordinates(currentUserLocation!, markers[1].point);
-
-        LatLngBounds bounds = LatLngBounds.fromPoints(
-            markers.map((marker) => marker.point).toList());
-        // mapController.fitBounds(bounds);
       }
     });
   }
@@ -169,15 +193,16 @@ class _MapScreenState extends State<Map> {
                 userAgentPackageName: 'dev.fleaflet.flutter_map.example',
               ),
               MarkerLayer(markers: markers),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: points,
-                    color: Colors.green,
-                    strokeWidth: 5,
-                  ),
-                ],
-              ),
+              if (points.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: points,
+                      color: Colors.green,
+                      strokeWidth: 5,
+                    ),
+                  ],
+                ),
             ],
           ),
           Visibility(
@@ -187,9 +212,7 @@ class _MapScreenState extends State<Map> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                 child: const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                  ),
+                  child: CircularProgressIndicator(color: Colors.white),
                 ),
               ),
             ),
@@ -209,7 +232,11 @@ class _MapScreenState extends State<Map> {
                         point: currentUserLocation!,
                         width: 80,
                         height: 80,
-                        child: Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+                        child: Icon(
+                          Icons.accessibility_new,
+                          size: 45,
+                          color: Colors.blue,
+                        ),
                       ),
                     );
                   }
@@ -219,37 +246,17 @@ class _MapScreenState extends State<Map> {
                 width: 200,
                 height: 50,
                 decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(10)),
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: const Center(
                   child: Text(
-                    "Limpar rota",
+                    "Clear route",
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          const SizedBox(height: 10),
-          FloatingActionButton(
-            backgroundColor: Colors.black,
-            onPressed: () {
-              // mapController.move(mapController.center, mapController.zoom + 1);
-            },
-            child: const Icon(Icons.add, color: Colors.white),
-          ),
-          const SizedBox(height: 10),
-          FloatingActionButton(
-            backgroundColor: Colors.black,
-            onPressed: () {
-              // mapController.move(mapController.center, mapController.zoom - 1);
-            },
-            child: const Icon(Icons.remove, color: Colors.white),
           ),
         ],
       ),
