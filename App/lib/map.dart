@@ -94,7 +94,7 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     final OpenRouteService client = OpenRouteService(
-      apiKey: 'blah',
+      apiKey: '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77',
     );
 
     final List<ORSCoordinate> routeCoordinates =
