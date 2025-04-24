@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:open_route_service/open_route_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -13,7 +14,7 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final defaultPoint = LatLng(39.5073, -84.7452); // Centered on Oxford, OH
+  final defaultPoint = LatLng(39.5073, -84.7452); // Oxford, OH
   late LatLng myPoint;
   bool isLoading = false;
 
@@ -22,10 +23,69 @@ class _MapScreenState extends State<MapScreen> {
 
   final MapController mapController = MapController();
 
+  LatLng? currentUserLocation;
+  Timer? locationUpdateTimer;
+
   @override
   void initState() {
     myPoint = defaultPoint;
     super.initState();
+    _initializeLocation();
+  }
+
+  Future<void> _initializeLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    final Position position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    currentUserLocation = LatLng(position.latitude, position.longitude);
+    myPoint = currentUserLocation!;
+    _startLiveLocationUpdates();
+
+    setState(() {
+      markers.add(
+        Marker(
+          point: currentUserLocation!,
+          width: 80,
+          height: 80,
+          builder: (context) => const Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+        ),
+      );
+    });
+  }
+
+  void _startLiveLocationUpdates() {
+    locationUpdateTimer = Timer.periodic(const Duration(seconds: 2), (Timer t) async {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      LatLng newLocation = LatLng(position.latitude, position.longitude);
+
+      if (currentUserLocation != null) {
+        double distanceMoved = const Distance().as(
+          LengthUnit.Meter,
+          currentUserLocation!,
+          newLocation,
+        );
+
+        if (distanceMoved > 5 && markers.length == 2) {
+          currentUserLocation = newLocation;
+          markers[0] = Marker(
+            point: newLocation,
+            width: 80,
+            height: 80,
+            builder: (context) => const Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+          );
+
+          await getCoordinates(newLocation, markers[1].point);
+          setState(() {});
+        }
+      }
+    });
   }
 
   Future<void> getCoordinates(LatLng lat1, LatLng lat2) async {
@@ -34,7 +94,7 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     final OpenRouteService client = OpenRouteService(
-      apiKey: 'YOUR-API-KEY', // Replace with your own or your hosted API
+      apiKey: 'blah',
     );
 
     final List<ORSCoordinate> routeCoordinates =
@@ -43,7 +103,7 @@ class _MapScreenState extends State<MapScreen> {
           ORSCoordinate(latitude: lat1.latitude, longitude: lat1.longitude),
       endCoordinate:
           ORSCoordinate(latitude: lat2.latitude, longitude: lat2.longitude),
-      profile: ORSProfile.footWheelchair, // Accessibility-focused routing
+      profile: ORSProfile.footWheelchair,
     );
 
     final List<LatLng> routePoints = routeCoordinates
@@ -64,34 +124,31 @@ class _MapScreenState extends State<MapScreen> {
             point: latLng,
             width: 80,
             height: 80,
-            builder: (context) => IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.accessibility),
-              color: Colors.black,
-              iconSize: 45,
-            ),
+            builder: (context) => const Icon(Icons.flag, color: Colors.red, size: 45),
           ),
         );
       }
 
-      if (markers.length == 1) {
-        mapController.move(latLng, 17.0);
-      }
-
-      if (markers.length == 2) {
+      if (markers.length == 2 && currentUserLocation != null) {
         Future.delayed(const Duration(milliseconds: 300), () {
           setState(() {
             isLoading = true;
           });
         });
 
-        getCoordinates(markers[0].point, markers[1].point);
+        getCoordinates(currentUserLocation!, markers[1].point);
 
         LatLngBounds bounds = LatLngBounds.fromPoints(
             markers.map((marker) => marker.point).toList());
         mapController.fitBounds(bounds);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    locationUpdateTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -146,6 +203,17 @@ class _MapScreenState extends State<MapScreen> {
                 setState(() {
                   markers = [];
                   points = [];
+
+                  if (currentUserLocation != null) {
+                    markers.add(
+                      Marker(
+                        point: currentUserLocation!,
+                        width: 80,
+                        height: 80,
+                        builder: (context) => const Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+                      ),
+                    );
+                  }
                 });
               },
               child: Container(
