@@ -6,14 +6,14 @@ import 'package:latlong2/latlong.dart';
 import 'package:open_route_service/open_route_service.dart';
 import 'package:geolocator/geolocator.dart';
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+class Map extends StatefulWidget {
+  const Map({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  State<Map> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<Map> {
   final defaultPoint = LatLng(39.5073, -84.7452); // Oxford, OH
   late LatLng myPoint;
   bool isLoading = false;
@@ -52,7 +52,7 @@ class _MapScreenState extends State<MapScreen> {
           point: currentUserLocation!,
           width: 80,
           height: 80,
-          builder: (context) => const Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+          child: Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
         ),
       );
     });
@@ -78,7 +78,7 @@ class _MapScreenState extends State<MapScreen> {
             point: newLocation,
             width: 80,
             height: 80,
-            builder: (context) => const Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+            child: Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
           );
 
           await getCoordinates(newLocation, markers[1].point);
@@ -103,7 +103,7 @@ class _MapScreenState extends State<MapScreen> {
           ORSCoordinate(latitude: lat1.latitude, longitude: lat1.longitude),
       endCoordinate:
           ORSCoordinate(latitude: lat2.latitude, longitude: lat2.longitude),
-      profile: ORSProfile.footWheelchair,
+      // profile: ORSProfile.footWheelchair,
     );
 
     final List<LatLng> routePoints = routeCoordinates
@@ -124,7 +124,7 @@ class _MapScreenState extends State<MapScreen> {
             point: latLng,
             width: 80,
             height: 80,
-            builder: (context) => const Icon(Icons.flag, color: Colors.red, size: 45),
+            child: Icon(Icons.flag, color: Colors.red, size: 45),
           ),
         );
       }
@@ -140,7 +140,7 @@ class _MapScreenState extends State<MapScreen> {
 
         LatLngBounds bounds = LatLngBounds.fromPoints(
             markers.map((marker) => marker.point).toList());
-        mapController.fitBounds(bounds);
+        // mapController.fitBounds(bounds);
       }
     });
   }
@@ -159,8 +159,8 @@ class _MapScreenState extends State<MapScreen> {
           FlutterMap(
             mapController: mapController,
             options: MapOptions(
-              zoom: 16,
-              center: myPoint,
+              initialZoom: 16,
+              initialCenter: myPoint,
               onTap: (tapPosition, latLng) => _handleTap(latLng),
             ),
             children: [
@@ -170,7 +170,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
               MarkerLayer(markers: markers),
               PolylineLayer(
-                polylineCulling: false,
                 polylines: [
                   Polyline(
                     points: points,
@@ -210,7 +209,7 @@ class _MapScreenState extends State<MapScreen> {
                         point: currentUserLocation!,
                         width: 80,
                         height: 80,
-                        builder: (context) => const Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+                        child: Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
                       ),
                     );
                   }
@@ -240,7 +239,7 @@ class _MapScreenState extends State<MapScreen> {
           FloatingActionButton(
             backgroundColor: Colors.black,
             onPressed: () {
-              mapController.move(mapController.center, mapController.zoom + 1);
+              // mapController.move(mapController.center, mapController.zoom + 1);
             },
             child: const Icon(Icons.add, color: Colors.white),
           ),
@@ -248,7 +247,7 @@ class _MapScreenState extends State<MapScreen> {
           FloatingActionButton(
             backgroundColor: Colors.black,
             onPressed: () {
-              mapController.move(mapController.center, mapController.zoom - 1);
+              // mapController.move(mapController.center, mapController.zoom - 1);
             },
             child: const Icon(Icons.remove, color: Colors.white),
           ),

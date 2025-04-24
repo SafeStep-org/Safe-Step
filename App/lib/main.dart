@@ -5,6 +5,7 @@ import 'ble_manager.dart';
 import 'tts_manager.dart';
 import 'connect.dart';
 import 'settings.dart';
+import 'map.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,7 @@ class _MainPageState extends State<MainPage> {
 
   final List<Widget> _pages = [
     Connect(),
+    Map(),
     Settings(),
   ];
 
@@ -78,6 +80,10 @@ class _MainPageState extends State<MainPage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.bluetooth),
             label: 'Connect',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Map',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
