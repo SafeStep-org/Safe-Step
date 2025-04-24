@@ -17,7 +17,6 @@ class MapPage extends StatelessWidget {
         children: [
           TileLayer(
             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.accessible_routes_app',
           ),
         ],
       ),
