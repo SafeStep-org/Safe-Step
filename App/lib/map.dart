@@ -157,8 +157,6 @@ class _MapScreenState extends State<MapScreen> {
         [start.longitude, start.latitude], // OpenRouteService expects [lng, lat]!
         [end.longitude, end.latitude]
       ],
-      "profile": "foot-walking",
-      "options": {"wheelchair": true}  // Example of adding wheelchair option
     });
   
     final response = await http.post(
