@@ -70,11 +70,13 @@ def get_object_distance(bbox, disparity_map, Q, lidar_data=None):
     region = disparity_map[y1:y2, x1:x2]
     mask = region > 0
     if np.count_nonzero(mask) == 0:
+        print("No valid disparity data in the region.")
         return None
 
     disp_valid = region[mask]
     avg_disp = np.median(disp_valid)
     if avg_disp <= 0:
+        print(f"Invalid disparity (avg_disp={avg_disp})")
         return None
 
     # Reproject to 3D space using stereo vision
@@ -82,20 +84,24 @@ def get_object_distance(bbox, disparity_map, Q, lidar_data=None):
     center_x = (x1 + x2) // 2
     center_y = (y1 + y2) // 2
 
-    # Get stereo depth (in cm)
+    # Check if 3D points are valid
     stereo_depth = points_3D[center_y, center_x][2] * 100  # meters to cm
-    
+    print(f"Stereo Depth (cm): {stereo_depth}")
+
     # If LiDAR data is provided, combine it with the stereo depth
     if lidar_data:
         lidar_distance = lidar_data["distance"]
-        
+        print(f"LiDAR Distance: {lidar_distance} cm")
+
         # Using weighted average for fusion
         # Giving more weight to LiDAR data (since it's direct and may be more reliable in some cases)
         combined_distance = (stereo_depth * 0.3) + (lidar_distance * 0.7)
+        print(f"Combined Distance: {combined_distance} cm")
         return combined_distance
 
     # If no LiDAR data, use stereo depth
     return stereo_depth
+
 
 async def capture_and_detect(server):
     i = 0
