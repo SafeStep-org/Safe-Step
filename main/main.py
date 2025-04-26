@@ -108,11 +108,11 @@ def get_object_direction(bbox, image_width):
 
     # Determine direction based on x-coordinate of the bounding box center
     if center_x < image_width // 3:
-        return "left"
+        return "to your left"
     elif center_x > 2 * image_width // 3:
-        return "right"
+        return "to your right"
     else:
-        return "center"
+        return "straight ahead"
 
 async def capture_and_detect(server):
     i = 0
@@ -148,7 +148,7 @@ async def capture_and_detect(server):
                 if lidar_data:
                     distance_cm = lidar_data["distance"]
 
-            if distance_cm is not None and distance_cm < 200:  # within 2 meters
+            if distance_cm is not None and distance_cm < 1500:  # within 2 meters
                 direction = get_object_direction((x1, y1, x2, y2), imgL.shape[1])  # imgL.shape[1] gives image width
                 detected_obstacles.append({
                     "label": label,
@@ -159,10 +159,11 @@ async def capture_and_detect(server):
         print("Detected obstacles:", detected_obstacles)
 
         if detected_obstacles:
-            message = {"obstacles": detected_obstacles}
-            await server.send_message(str(message).replace("'", '"'))  # JSON-ish string
-        else:
-            await server.send_message('"status": "No nearby obstacles"')
+            closest = min(detected_obstacles, key=lambda x: x["distance_cm"])
+            message = f"{closest["label"]} detected {closest["distance_cm" / 100]} meters {closest["direction"]}"
+            await server.send_message(str(message).replace("'", '"')) 
+        # else:
+            # await server.send_message('"status": "No nearby obstacles"')
 
         i += 1
         await asyncio.sleep(5)
