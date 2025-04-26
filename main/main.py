@@ -161,7 +161,7 @@ async def capture_and_detect(server):
         if detected_obstacles:
             closest = min(detected_obstacles, key=lambda x: x["distance_cm"])
             message = f"{closest["label"]} detected {closest["distance_cm" / 100]} meters {closest["direction"]}"
-            await server.send_message(str(message).replace("'", '"')) 
+            await server.send_message(str(message)) 
         # else:
             # await server.send_message('"status": "No nearby obstacles"')
 
