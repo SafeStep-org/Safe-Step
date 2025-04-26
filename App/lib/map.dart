@@ -1,196 +1,48 @@
 import 'dart:async';
-import 'dart:ui';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:open_route_service/open_route_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
-import 'tts_manager.dart';
+class NavigationStep {
+  final LatLng location;
+  final String instruction;
+  bool announced;
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
-
-  @override
-  State<MapScreen> createState() => _MapScreenState();
+  NavigationStep({
+    required this.location,
+    required this.instruction,
+    this.announced = false,
+  });
 }
 
-class _MapScreenState extends State<MapScreen> {
-  late TtsManager _ttsManager;
-  final Map<String, LatLng> presetDestinations = {
-    "King Library": LatLng(39.5088, -84.7380),
-    "McVey Data Science Building": LatLng(39.5113889, -84.7338886),
-    "Western Dining Hall": LatLng(39.504586012616755, -84.72809886040675),
-  };
+class NavigationPage extends StatefulWidget {
+  final LatLng start;
+  final LatLng end;
 
-  String? selectedDestination; // Track selected destination
+  const NavigationPage({super.key, required this.start, required this.end});
 
-  final defaultPoint = LatLng(39.5073, -84.7452); // Oxford, OH
-  late LatLng myPoint;
-  bool isLoading = false;
+  @override
+  State<NavigationPage> createState() => _NavigationPageState();
+}
 
-  List<LatLng> points = [];
+class _NavigationPageState extends State<NavigationPage> {
+  final mapController = MapController();
+
+  List<NavigationStep> navigationSteps = [];
+  List<LatLng> routePoints = [];
   List<Marker> markers = [];
-
-  final MapController mapController = MapController();
 
   LatLng? currentUserLocation;
   Timer? locationUpdateTimer;
 
   @override
   void initState() {
-    myPoint = defaultPoint;
     super.initState();
-    _initializeLocation();
-  }
-
-  Future<void> _initializeLocation() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    final Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    if (!mounted) return;
-
-    currentUserLocation = LatLng(position.latitude, position.longitude);
-    myPoint = currentUserLocation!;
-
-    _startLiveLocationUpdates();
-
-    setState(() {
-      markers.add(
-        Marker(
-          point: currentUserLocation!,
-          width: 80,
-          height: 80,
-          child: const Icon(
-            Icons.accessibility_new,
-            size: 45,
-            color: Colors.blue,
-          ),
-        ),
-      );
-    });
-
-    mapController.move(currentUserLocation!, 16);
-  }
-
-  void _startLiveLocationUpdates() {
-    locationUpdateTimer = Timer.periodic(const Duration(seconds: 2), (
-      Timer t,
-    ) async {
-      if (!mounted) return;
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      LatLng newLocation = LatLng(position.latitude, position.longitude);
-
-      if (currentUserLocation != null) {
-        double distanceMoved = const Distance().as(
-          LengthUnit.Meter,
-          currentUserLocation!,
-          newLocation,
-        );
-
-        if (distanceMoved > 5 && markers.length == 2) {
-          currentUserLocation = newLocation;
-
-          markers[0] = Marker(
-            point: newLocation,
-            width: 80,
-            height: 80,
-            child: const Icon(
-              Icons.accessibility_new,
-              size: 45,
-              color: Colors.blue,
-            ),
-          );
-
-          await getCoordinates(newLocation, markers[1].point);
-
-          if (!mounted) return;
-          setState(() {});
-        }
-      }
-    });
-  }
-
-  // Define this model globally to store instructions
-  List<String> navigationInstructions = [];
-  
-  Future<void> getCoordinates(LatLng start, LatLng end) async {
-    if (!mounted) return;
-  
-    setState(() {
-      isLoading = true;
-    });
-  
-    const apiKey = '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77'; // Replace with your OpenRouteService API key
-  
-    final url = Uri.parse('https://api.openrouteservice.org/v2/directions/foot-walking/geojson');
-  
-    final body = jsonEncode({
-      "coordinates": [
-        [start.longitude, start.latitude], // OpenRouteService expects [lng, lat]!
-        [end.longitude, end.latitude]
-      ]
-    });
-  
-    final response = await http.post(
-      url,
-      headers: {
-        'Authorization': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: body,
-    );
-  
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-  
-      // Extract route coordinates
-      final coords = data['features'][0]['geometry']['coordinates'] as List;
-  
-      final List<LatLng> routePoints = coords.map<LatLng>((coord) {
-        return LatLng(coord[1], coord[0]); // Reverse [lng, lat] -> [lat, lng]
-      }).toList();
-  
-      // Extract navigation instructions
-      final steps = data['features'][0]['properties']['segments'][0]['steps'] as List;
-  
-      navigationInstructions = steps.map<String>((step) {
-        final instruction = step['instruction'];
-        final distance = step['distance'];
-        return '$instruction in ${distance.toStringAsFixed(0)} meters';
-      }).toList();
-  
-      if (!mounted) return;
-  
-      setState(() {
-        points = routePoints;
-        isLoading = false;
-      });
-  
-      // For debugging, you could print instructions
-      for (var instr in navigationInstructions) {
-        print(instr);
-      }
-  
-    } else {
-      if (!mounted) return;
-      setState(() {
-        isLoading = false;
-      });
-      throw Exception('Failed to get route: ${response.body}');
-    }
+    _initializeRoute();
   }
 
   @override
@@ -199,139 +51,138 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
+  Future<void> _initializeRoute() async {
+    final response = await http.post(
+      Uri.parse('https://api.openrouteservice.org/v2/directions/foot-walking/geojson'),
+      headers: {
+        'Authorization': '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "coordinates": [
+          [widget.start.longitude, widget.start.latitude],
+          [widget.end.longitude, widget.end.latitude]
+        ],
+        "extra_info": ["wheelchair", "surface", "steepness"]
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final features = data['features'][0];
+      final coords = features['geometry']['coordinates'] as List;
+
+      routePoints = coords
+          .map((c) => LatLng(c[1] as double, c[0] as double))
+          .toList();
+
+      final steps = features['properties']['segments'][0]['steps'] as List;
+
+      for (var step in steps) {
+        final instruction = step['instruction'];
+        final waypoints = step['way_points'];
+        final pointCoord = coords[waypoints[0]];
+        final location = LatLng(pointCoord[1] as double, pointCoord[0] as double);
+
+        navigationSteps.add(NavigationStep(
+          location: location,
+          instruction: instruction,
+        ));
+      }
+
+      markers = [
+        Marker(
+          point: widget.start,
+          width: 80,
+          height: 80,
+          child: const Icon(Icons.location_on, color: Colors.green, size: 45),
+        ),
+        Marker(
+          point: widget.end,
+          width: 80,
+          height: 80,
+          child: const Icon(Icons.flag, color: Colors.red, size: 45),
+        ),
+      ];
+
+      setState(() {});
+      _startLiveLocationUpdates();
+    } else {
+      print('Failed to fetch route: ${response.body}');
+    }
+  }
+
+  void _startLiveLocationUpdates() {
+    locationUpdateTimer = Timer.periodic(const Duration(seconds: 2), (Timer t) async {
+      if (!mounted) return;
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      LatLng newLocation = LatLng(position.latitude, position.longitude);
+
+      if (currentUserLocation == null || const Distance().as(LengthUnit.Meter, currentUserLocation!, newLocation) > 3) {
+        currentUserLocation = newLocation;
+
+        markers[0] = Marker(
+          point: newLocation,
+          width: 80,
+          height: 80,
+          child: const Icon(Icons.accessibility_new, color: Colors.blue, size: 45),
+        );
+
+        _checkNavigationSteps(newLocation);
+
+        if (!mounted) return;
+        setState(() {});
+      }
+    });
+  }
+
+  void _checkNavigationSteps(LatLng currentLocation) {
+    for (var step in navigationSteps) {
+      if (!step.announced) {
+        double distanceToStep = const Distance().as(
+          LengthUnit.Meter,
+          currentLocation,
+          step.location,
+        );
+
+        if (distanceToStep < 20) {
+          print("NAVIGATION: ${step.instruction} in ${distanceToStep.toStringAsFixed(0)} meters");
+          step.announced = true;
+          break; // announce only one at a time
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      appBar: AppBar(title: const Text("Accessible Navigation")),
+      body: FlutterMap(
+        mapController: mapController,
+        options: MapOptions(
+          center: widget.start,
+          zoom: 16,
+        ),
         children: [
-          FlutterMap(
-            mapController: mapController,
-            options: MapOptions(
-              initialZoom: 16,
-              initialCenter: myPoint,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                userAgentPackageName: 'dev.fleaflet.flutter_map.example',
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.app',
+          ),
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: routePoints,
+                color: Colors.blue,
+                strokeWidth: 4,
               ),
-              MarkerLayer(markers: markers),
-              if (points.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: points,
-                      color: Colors.green,
-                      strokeWidth: 5,
-                    ),
-                  ],
-                ),
             ],
           ),
-          Visibility(
-            visible: isLoading,
-            child: Container(
-              color: Colors.black.withOpacity(0.5),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                child: const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 20.0,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: DropdownButton<String>(
-                isExpanded: true,
-                hint: const Text("Select a destination"),
-                value: selectedDestination,
-                underline: SizedBox(),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: null,
-                    child: Text("No destination"),
-                  ),
-                  ...presetDestinations.keys.map((String destinationName) {
-                    return DropdownMenuItem<String>(
-                      value: destinationName,
-                      child: Text(destinationName),
-                    );
-                  }),
-                ],
-                onChanged: (String? newValue) {
-                  if (currentUserLocation != null) {
-                    setState(() {
-                      selectedDestination = newValue;
-
-                      if (newValue == null) {
-                        // Clear route and keep only user's marker
-                        markers = [
-                          Marker(
-                            point: currentUserLocation!,
-                            width: 80,
-                            height: 80,
-                            child: const Icon(
-                              Icons.accessibility_new,
-                              size: 45,
-                              color: Colors.blue,
-                            ),
-                          ),
-                        ];
-                        points = [];
-                      } else {
-                        // Set user's marker and destination marker
-                        markers = [
-                          Marker(
-                            point: currentUserLocation!,
-                            width: 80,
-                            height: 80,
-                            child: const Icon(
-                              Icons.accessibility_new,
-                              size: 45,
-                              color: Colors.blue,
-                            ),
-                          ),
-                          Marker(
-                            point: presetDestinations[newValue]!,
-                            width: 80,
-                            height: 80,
-                            child: const Icon(
-                              Icons.flag,
-                              size: 45,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ];
-                        points = [];
-                        isLoading = true;
-
-                        getCoordinates(
-                          currentUserLocation!,
-                          presetDestinations[newValue]!,
-                        );
-                      }
-                    });
-                  }
-                },
-              ),
-            ),
-          ),
+          MarkerLayer(markers: markers),
         ],
       ),
     );
