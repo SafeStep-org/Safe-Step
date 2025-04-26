@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:open_route_service/open_route_service.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'tts_manager.dart';
@@ -39,6 +38,8 @@ class _MapScreenState extends State<MapScreen> {
 
   LatLng? currentUserLocation;
   Timer? locationUpdateTimer;
+
+  List<dynamic> steps = []; // Add this to hold the step-by-step directions
 
   @override
   void initState() {
@@ -120,12 +121,26 @@ class _MapScreenState extends State<MapScreen> {
           setState(() {});
         }
       }
+
+      // Check if the user is near a turn step
+      if (steps.isNotEmpty) {
+        for (var step in steps) {
+          final stepLocation = LatLng(step['location'][1], step['location'][0]);
+          double distanceToTurn = const Distance().as(LengthUnit.Meter, newLocation, stepLocation);
+  
+          // If within 50 meters of the turn, show the instruction
+          if (distanceToTurn <= 50) {
+            print('Next turn: ${step['instruction']} in ${step['distance']} meters');
+            // You can display this instruction on your UI, e.g., show a dialog, update a label, etc.
+          }
+        }
+      }
     });
   }
 
   // Define this model globally to store instructions
   List<String> navigationInstructions = [];
-  
+
   Future<void> getCoordinates(LatLng start, LatLng end) async {
     if (!mounted) return;
   
@@ -141,7 +156,9 @@ class _MapScreenState extends State<MapScreen> {
       "coordinates": [
         [start.longitude, start.latitude], // OpenRouteService expects [lng, lat]!
         [end.longitude, end.latitude]
-      ]
+      ],
+      "profile": "foot-walking",
+      "options": {"wheelchair": true}  // Example of adding wheelchair option
     });
   
     final response = await http.post(
@@ -164,9 +181,10 @@ class _MapScreenState extends State<MapScreen> {
       }).toList();
   
       // Extract navigation instructions
-      final steps = data['features'][0]['properties']['segments'][0]['steps'] as List;
-  
-      navigationInstructions = steps.map<String>((step) {
+      final stepsFromResponse = data['features'][0]['properties']['segments'][0]['steps'] as List;
+      steps = stepsFromResponse;
+
+      navigationInstructions = stepsFromResponse.map<String>((step) {
         final instruction = step['instruction'];
         final distance = step['distance'];
         return '$instruction in ${distance.toStringAsFixed(0)} meters';
