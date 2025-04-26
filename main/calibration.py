@@ -4,7 +4,7 @@ import glob
 import sys
 
 
-chessboard_size = (10, 77)
+chessboard_size = (10, 7)
 square_size = 0.016
 image_format = 'jpg'
 
