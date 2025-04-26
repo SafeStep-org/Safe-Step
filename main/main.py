@@ -102,6 +102,17 @@ def get_object_distance(bbox, disparity_map, Q, lidar_data=None):
     # If no LiDAR data, use stereo depth
     return stereo_depth
 
+def get_object_direction(bbox, image_width):
+    x1, _, x2, _ = map(int, bbox)
+    center_x = (x1 + x2) // 2
+
+    # Determine direction based on x-coordinate of the bounding box center
+    if center_x < image_width // 3:
+        return "left"
+    elif center_x > 2 * image_width // 3:
+        return "right"
+    else:
+        return "center"
 
 async def capture_and_detect(server):
     i = 0
@@ -138,9 +149,11 @@ async def capture_and_detect(server):
                     distance_cm = lidar_data["distance"]
 
             if distance_cm is not None and distance_cm < 200:  # within 2 meters
+                direction = get_object_direction((x1, y1, x2, y2), imgL.shape[1])  # imgL.shape[1] gives image width
                 detected_obstacles.append({
                     "label": label,
-                    "distance_cm": round(distance_cm, 1)
+                    "distance_cm": round(distance_cm, 1),
+                    "direction": direction
                 })
 
         print("Detected obstacles:", detected_obstacles)
