@@ -7,14 +7,25 @@ import 'package:latlong2/latlong.dart';
 import 'package:open_route_service/open_route_service.dart';
 import 'package:geolocator/geolocator.dart';
 
-class Map extends StatefulWidget {
-  const Map({super.key});
+import 'tts_manager.dart';
+
+class MapScreen extends StatefulWidget {
+  const MapScreen({super.key});
 
   @override
-  State<Map> createState() => _MapScreenState();
+  State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<Map> {
+class _MapScreenState extends State<MapScreen> {
+  late TtsManager _ttsManager;
+  final Map<String, LatLng> presetDestinations = {
+    "King Library": LatLng(39.5088, -84.7380),
+    "McVey Data Science Building": LatLng(39.5113889, -84.7338886),
+    "Western Dining Hall": LatLng(39.504586012616755, -84.72809886040675),
+  };
+
+  String? selectedDestination; // Track selected destination
+
   final defaultPoint = LatLng(39.5073, -84.7452); // Oxford, OH
   late LatLng myPoint;
   bool isLoading = false;
@@ -44,7 +55,7 @@ class _MapScreenState extends State<Map> {
     final Position position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
-    if (!mounted) return; // <-- Add this
+    if (!mounted) return;
 
     currentUserLocation = LatLng(position.latitude, position.longitude);
     myPoint = currentUserLocation!;
@@ -57,10 +68,16 @@ class _MapScreenState extends State<Map> {
           point: currentUserLocation!,
           width: 80,
           height: 80,
-          child: Icon(Icons.accessibility_new, size: 45, color: Colors.blue),
+          child: const Icon(
+            Icons.accessibility_new,
+            size: 45,
+            color: Colors.blue,
+          ),
         ),
       );
     });
+
+    mapController.move(currentUserLocation!, 16);
   }
 
   void _startLiveLocationUpdates() {
@@ -142,33 +159,6 @@ class _MapScreenState extends State<Map> {
     });
   }
 
-  void _handleTap(LatLng latLng) {
-    setState(() {
-      if (markers.length < 2) {
-        markers.add(
-          Marker(
-            point: latLng,
-            width: 80,
-            height: 80,
-            child: Icon(Icons.flag, color: Colors.red, size: 45),
-          ),
-        );
-      }
-
-      if (markers.length == 2 && currentUserLocation != null) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (!mounted) return;
-
-          setState(() {
-            isLoading = true;
-          });
-        });
-
-        getCoordinates(currentUserLocation!, markers[1].point);
-      }
-    });
-  }
-
   @override
   void dispose() {
     locationUpdateTimer?.cancel();
@@ -185,7 +175,6 @@ class _MapScreenState extends State<Map> {
             options: MapOptions(
               initialZoom: 16,
               initialCenter: myPoint,
-              onTap: (tapPosition, latLng) => _handleTap(latLng),
             ),
             children: [
               TileLayer(
@@ -219,42 +208,93 @@ class _MapScreenState extends State<Map> {
           ),
           Positioned(
             top: MediaQuery.of(context).padding.top + 20.0,
-            left: MediaQuery.of(context).size.width / 2 - 110,
-            child: TextButton(
-              onPressed: () {
-                setState(() {
-                  markers = [];
-                  points = [];
-
-                  if (currentUserLocation != null) {
-                    markers.add(
-                      Marker(
-                        point: currentUserLocation!,
-                        width: 80,
-                        height: 80,
-                        child: Icon(
-                          Icons.accessibility_new,
-                          size: 45,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    );
-                  }
-                });
-              },
-              child: Container(
-                width: 200,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Center(
-                  child: Text(
-                    "Clear route",
-                    style: TextStyle(color: Colors.white, fontSize: 18),
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 5,
+                    offset: Offset(0, 2),
                   ),
-                ),
+                ],
+              ),
+              child: DropdownButton<String>(
+                isExpanded: true,
+                hint: const Text("Select a destination"),
+                value: selectedDestination,
+                underline: SizedBox(),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text("No destination"),
+                  ),
+                  ...presetDestinations.keys.map((String destinationName) {
+                    return DropdownMenuItem<String>(
+                      value: destinationName,
+                      child: Text(destinationName),
+                    );
+                  }),
+                ],
+                onChanged: (String? newValue) {
+                  if (currentUserLocation != null) {
+                    setState(() {
+                      selectedDestination = newValue;
+
+                      if (newValue == null) {
+                        // Clear route and keep only user's marker
+                        markers = [
+                          Marker(
+                            point: currentUserLocation!,
+                            width: 80,
+                            height: 80,
+                            child: const Icon(
+                              Icons.accessibility_new,
+                              size: 45,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ];
+                        points = [];
+                      } else {
+                        // Set user's marker and destination marker
+                        markers = [
+                          Marker(
+                            point: currentUserLocation!,
+                            width: 80,
+                            height: 80,
+                            child: const Icon(
+                              Icons.accessibility_new,
+                              size: 45,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          Marker(
+                            point: presetDestinations[newValue]!,
+                            width: 80,
+                            height: 80,
+                            child: const Icon(
+                              Icons.flag,
+                              size: 45,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ];
+                        points = [];
+                        isLoading = true;
+
+                        getCoordinates(
+                          currentUserLocation!,
+                          presetDestinations[newValue]!,
+                        );
+                      }
+                    });
+                  }
+                },
               ),
             ),
           ),
