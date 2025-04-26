@@ -5,8 +5,8 @@ import sys
 
 # distance between cameras : 2.5 cm
 
-chessboard_size = (10, 7)
-square_size = 0.015  # in meters (2.5 cm)
+chessboard_size = (10, 77)
+square_size = 0.016  # in meters (2.5 cm)
 image_format = 'jpg'
     
 
@@ -35,13 +35,6 @@ for imgL_path, imgR_path in zip(images_left, images_right):
         imgpoints_left.append(cornersL)
         imgpoints_right.append(cornersR)
 
-        cv2.drawChessboardCorners(imgL, chessboard_size, cornersL, retL)
-        cv2.drawChessboardCorners(imgR, chessboard_size, cornersR, retR)
-        cv2.imshow('Left', imgL)
-        cv2.imshow('Right', imgR)
-        cv2.waitKey(100)
-
-cv2.destroyAllWindows()
 
 # Calibrate single cameras
 retL, mtxL, distL, _, _ = cv2.calibrateCamera(objpoints, imgpoints_left, grayL.shape[::-1], None, None)
