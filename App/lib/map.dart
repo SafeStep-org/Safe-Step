@@ -133,9 +133,9 @@ class _MapScreenState extends State<MapScreen> {
       isLoading = true;
     });
   
-    const apiKey = 'YOUR_API_KEY_HERE'; // Replace with your OpenRouteService API key
+    const apiKey = '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77'; // Replace with your OpenRouteService API key
   
-    final url = Uri.parse('https://api.openrouteservice.org/v2/directions/wheelchair/geojson');
+    final url = Uri.parse('https://api.openrouteservice.org/v2/directions/foot-walking/geojson');
   
     final body = jsonEncode({
       "coordinates": [
