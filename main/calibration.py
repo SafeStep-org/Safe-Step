@@ -3,12 +3,10 @@ import numpy as np
 import glob
 import sys
 
-# distance between cameras : 2.5 cm
 
 chessboard_size = (10, 77)
-square_size = 0.016  # in meters (2.5 cm)
+square_size = 0.016
 image_format = 'jpg'
-    
 
 objp = np.zeros((chessboard_size[0]*chessboard_size[1], 3), np.float32)
 objp[:, :2] = np.mgrid[0:chessboard_size[0], 0:chessboard_size[1]].T.reshape(-1, 2)
@@ -31,10 +29,13 @@ for imgL_path, imgR_path in zip(images_left, images_right):
     retR, cornersR = cv2.findChessboardCorners(grayR, chessboard_size, None)
 
     if retL and retR:
+        criteria_subpix = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        cornersL = cv2.cornerSubPix(grayL, cornersL, (11, 11), (-1, -1), criteria_subpix)
+        cornersR = cv2.cornerSubPix(grayR, cornersR, (11, 11), (-1, -1), criteria_subpix)
+
         objpoints.append(objp)
         imgpoints_left.append(cornersL)
         imgpoints_right.append(cornersR)
-
 
 # Calibrate single cameras
 retL, mtxL, distL, _, _ = cv2.calibrateCamera(objpoints, imgpoints_left, grayL.shape[::-1], None, None)
