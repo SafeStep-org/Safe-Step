@@ -101,7 +101,7 @@ class _MapScreenState extends State<MapScreen> {
           newLocation,
         );
 
-        if (distanceMoved > 5 && markers.length == 2) {
+        if (distanceMoved > 1 && markers.length == 2) {
           currentUserLocation = newLocation;
 
           markers[0] = Marker(
