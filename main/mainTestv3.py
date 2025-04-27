@@ -25,7 +25,7 @@ ser = serial.Serial("/dev/ttyAMA0", 115200)
 
 print("Loading YOLO models...")
 model_general = YOLO("yolo11s.pt")           # COCO (people, cars, etc.)
-model_crosswalk = YOLO("your_crosswalk_model.pt")  # Your crosswalk model
+model_crosswalk = YOLO("yolov8n.pt")  # Your crosswalk model
 
 # Load stereo calibration data
 calib = np.load("stereo_calib_data.npz")
@@ -93,7 +93,7 @@ async def capture_and_detect(server):
         print("Running object detection (YOLO11s)...")
         results_general = model_general(imgL_rgb)[0]
 
-        print("Running crosswalk detection (YOLO8)...")
+        print("Running crosswalk detection (YOLOv8n)...")
         results_crosswalk = model_crosswalk(imgL_rgb)[0]
 
         print("Computing depth map...")
