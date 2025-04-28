@@ -134,6 +134,8 @@ def capture_and_detect():
 
         print("Computing depth map...")
         disparity = compute_depth_map(imgL, imgR)
+        disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+        disp_vis = np.uint8(disp_vis)
         
         # Visualize disparity map
         plt.imshow(disp_vis, cmap='plasma')
