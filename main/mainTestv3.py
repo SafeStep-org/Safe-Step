@@ -211,31 +211,41 @@ def capture_and_detect():
         # Step 2: If no YOLO detections found, fallback to closest pixel
         if not detected_objects:
             print("No YOLO detections, falling back to closest depth pixel.")
-
+        
             mask_valid = (disparity > valid_disp_min) & (disparity < valid_disp_max)
-
+        
             if not np.any(mask_valid):
                 print("No valid disparity points found.")
                 i += 1
                 time.sleep(5)
                 continue
-
-            min_disp_idx = np.unravel_index(np.argmax(mask_valid * disparity), disparity.shape)
-            center_y, center_x = min_disp_idx
-
-            point_3D = points_3D[center_y, center_x]
-            distance_cm = point_3D[2] * 100
-
+        
+            # Find the valid pixel with the minimum Z-distance (closest)
+            distances_cm = points_3D[:, :, 2] * 100
+            distances_cm_masked = np.where(mask_valid, distances_cm, np.inf)
+            min_idx = np.unravel_index(np.argmin(distances_cm_masked), distances_cm_masked.shape)
+            center_y, center_x = min_idx
+        
+            distance_cm = distances_cm[center_y, center_x]
+        
+            # Reject the border artifacts (~20.7 cm constant)
+            if distance_cm <= 21.0:
+                print(f"Closest point ({distance_cm:.1f} cm) is likely border noise. Skipping...")
+                i += 1
+                time.sleep(5)
+                continue
+        
             if distance_cm <= 0 or distance_cm > 5000:
                 print("Depth map distance invalid or too far.")
                 i += 1
                 time.sleep(5)
                 continue
-
+        
             detected_objects.append({
                 "label": "obstacle",
                 "distance_cm": distance_cm
             })
+
 
         # Step 3: Choose the object with the minimum distance
         detected_objects = sorted(detected_objects, key=lambda x: x["distance_cm"])
