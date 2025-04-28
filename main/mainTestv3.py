@@ -163,7 +163,6 @@ def capture_and_detect():
         print("Computing depth map...")
         disparity = compute_depth_map(imgL, imgR)
 
-        # Normalize disparity for visualization
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         disp_vis = np.uint8(disp_vis)
         disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
@@ -172,62 +171,93 @@ def capture_and_detect():
         fig.canvas.draw()
         fig.canvas.flush_events()
 
-        # Step 1: Find closest point in disparity map
+        detected_objects = []
+
         valid_disp_min = 1
         valid_disp_max = 128
-        mask_valid = (disparity > valid_disp_min) & (disparity < valid_disp_max)
-
-        if not np.any(mask_valid):
-            print("No valid disparity points found.")
-            i += 1
-            time.sleep(5)
-            continue
-
-        min_disp_idx = np.unravel_index(np.argmax(mask_valid * disparity), disparity.shape)
-        center_y, center_x = min_disp_idx
 
         points_3D = cv2.reprojectImageTo3D(disparity, Q)
-        point_3D = points_3D[center_y, center_x]
-        distance_cm = point_3D[2] * 100  # meters to centimeters
 
-        if distance_cm <= 0 or distance_cm > 5000:
-            print("Depth map distance invalid or too far.")
-            i += 1
-            time.sleep(5)
-            continue
-
-        # Step 2: See if the point falls inside any YOLO bounding box
-        matched_label = "obstacle"
-
+        # Step 1: Analyze all YOLO detections
         for results, model in [(results_general, model_general), (results_crosswalk, model_crosswalk)]:
             for box in results.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                if x1 <= center_x <= x2 and y1 <= center_y <= y2:
-                    cls_id = int(box.cls[0])
-                    matched_label = model.names[cls_id]
-                    break
-            if matched_label != "obstacle":
-                break
+                cls_id = int(box.cls[0])
+                label = model.names[cls_id]
 
-        # Step 3: Cross-check with TF-Luna LiDAR
+                region = disparity[y1:y2, x1:x2]
+                mask = (region > valid_disp_min) & (region < valid_disp_max)
+
+                if np.count_nonzero(mask) == 0:
+                    continue
+
+                disp_valid = region[mask]
+                median_disp = np.median(disp_valid)
+
+                temp_disp_map = np.full_like(disparity, median_disp)
+                points_median = cv2.reprojectImageTo3D(temp_disp_map, Q)
+                center_x = (x1 + x2) // 2
+                center_y = (y1 + y2) // 2
+                distance_cm = points_median[center_y, center_x][2] * 100  # meters to cm
+
+                if distance_cm <= 0 or distance_cm > 5000:
+                    continue
+
+                detected_objects.append({
+                    "label": label,
+                    "distance_cm": distance_cm
+                })
+
+        # Step 2: If no YOLO detections found, fallback to closest pixel
+        if not detected_objects:
+            print("No YOLO detections, falling back to closest depth pixel.")
+
+            mask_valid = (disparity > valid_disp_min) & (disparity < valid_disp_max)
+
+            if not np.any(mask_valid):
+                print("No valid disparity points found.")
+                i += 1
+                time.sleep(5)
+                continue
+
+            min_disp_idx = np.unravel_index(np.argmax(mask_valid * disparity), disparity.shape)
+            center_y, center_x = min_disp_idx
+
+            point_3D = points_3D[center_y, center_x]
+            distance_cm = point_3D[2] * 100
+
+            if distance_cm <= 0 or distance_cm > 5000:
+                print("Depth map distance invalid or too far.")
+                i += 1
+                time.sleep(5)
+                continue
+
+            detected_objects.append({
+                "label": "obstacle",
+                "distance_cm": distance_cm
+            })
+
+        # Step 3: Choose the object with the minimum distance
+        detected_objects = sorted(detected_objects, key=lambda x: x["distance_cm"])
+        closest_object = detected_objects[0]
+
+        # Step 4: Cross-check with LiDAR
         lidar_data = read_tfluna_data()
         if lidar_data:
             lidar_distance_cm = lidar_data["distance"]
-            if abs(lidar_distance_cm - distance_cm) > 100:  # allow ±100 cm difference
-                print(f"Depth map distance ({distance_cm:.1f} cm) does not match LiDAR ({lidar_distance_cm:.1f} cm). Using LiDAR reading.")
-                distance_cm = lidar_distance_cm
+            if abs(lidar_distance_cm - closest_object["distance_cm"]) > 100:
+                print(f"Depth map distance ({closest_object['distance_cm']:.1f} cm) differs from LiDAR ({lidar_distance_cm:.1f} cm). Using LiDAR.")
+                closest_object["distance_cm"] = lidar_distance_cm
             else:
-                print(f"Depth map and LiDAR distances match within tolerance.")
+                print("Depth map and LiDAR distances match within tolerance.")
 
-        # Step 4: Report the closest object
+        # Step 5: Report
         print("\nClosest Object Detected:")
-        print(f"  Label: {matched_label}")
-        print(f"  Distance: {round(distance_cm, 1)} cm")
+        print(f"  Label: {closest_object['label']}")
+        print(f"  Distance: {round(closest_object['distance_cm'], 1)} cm")
 
         i += 1
         time.sleep(5)
-
-
 
 def main():
     try:
