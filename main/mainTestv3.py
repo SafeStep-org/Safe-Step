@@ -5,6 +5,7 @@ from picamera2 import Picamera2
 from libcamera import controls
 from ultralytics import YOLO
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Initialize hardware
 print("Initializing cameras...")
@@ -135,10 +136,11 @@ def capture_and_detect():
         disparity = compute_depth_map(imgL, imgR)
         
         # Visualize disparity map
-        disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
-        disp_vis = np.uint8(disp_vis)
-        cv2.imshow("Disparity Map", disp_vis)
-        cv2.waitKey(1)
+        plt.imshow(disp_vis, cmap='plasma')
+        plt.title("Disparity Map")
+        plt.axis('off')
+        plt.pause(0.001)  # Short pause to update
+        plt.clf()         # Clear figure for next frame
 
         detected_obstacles = []
 
