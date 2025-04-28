@@ -31,7 +31,6 @@ calib = np.load("stereo_calib_data.npz")
 mtxL, distL = calib['mtxL'], calib['distL']
 mtxR, distR = calib['mtxR'], calib['distR']
 R, T = calib['R'], calib['T']
-Q = calib['Q']
 
 # Get image size
 frameL = camera1.capture_array()
@@ -97,6 +96,7 @@ def compute_depth_map(imgL, imgR):
     grayR = cv2.cvtColor(rectR, cv2.COLOR_BGR2GRAY)
 
     disparity = stereo.compute(grayL, grayR).astype(np.float32) / 16.0
+    print(f"{np.min(disparity)} {np.max(disparity)} {np.mean(disparity)}" )
     return disparity
 
 def get_object_distance(bbox, disparity_map, Q):
