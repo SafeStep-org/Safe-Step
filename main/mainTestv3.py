@@ -73,7 +73,7 @@ def compute_depth_map(imgL, imgR):
     return disparity
 
 def get_object_distance(bbox, disparity_map, Q):
-    x1, y1, x2, x2 = map(int, bbox)
+    x1, y1, x2, y2 = map(int, bbox)
     region = disparity_map[y1:y2, x1:x2]
 
     # Only keep disparity values in a reasonable range
