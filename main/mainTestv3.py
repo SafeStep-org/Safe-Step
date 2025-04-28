@@ -30,6 +30,14 @@ model_crosswalk = YOLO("yolov8n.pt")         # Your crosswalk model
 calib = np.load("stereo_calib_data.npz")
 Q = calib["Q"]
 
+plt.ion()
+fig, ax = plt.subplots(figsize=(8, 6))
+disp_plot = ax.imshow(np.zeros((480, 640)), cmap='plasma')
+fig.colorbar(disp_plot)
+ax.set_title('Disparity Map')
+ax.axis('off')
+fig.tight_layout()
+
 def read_tfluna_data():
     time.sleep(1)
     output = {}
@@ -137,12 +145,10 @@ def capture_and_detect():
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         disp_vis = np.uint8(disp_vis)
         
-        # Visualize disparity map
-        plt.imshow(disp_vis, cmap='plasma')
-        plt.title("Disparity Map")
-        plt.axis('off')
-        plt.pause(0.001)  # Short pause to update
-        plt.clf()         # Clear figure for next frame
+        disp_plot.set_data(disp_vis)
+        disp_plot.set_clim(vmin=np.min(disp_vis), vmax=np.max(disp_vis))  # Optional: auto-contrast
+        fig.canvas.draw()
+        fig.canvas.flush_events()
 
         detected_obstacles = []
 
