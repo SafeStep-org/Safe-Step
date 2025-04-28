@@ -1,3 +1,4 @@
+import asyncio
 import serial
 import time
 import cv2
@@ -6,6 +7,7 @@ from libcamera import controls
 from ultralytics import YOLO
 import numpy as np
 import matplotlib.pyplot as plt
+import ble_server
 
 # Initialize hardware
 print("Initializing cameras...")
@@ -67,6 +69,9 @@ fig.colorbar(disp_plot)
 ax.set_title('Disparity Map')
 ax.axis('off')
 fig.tight_layout()
+
+print("Starting BLE Server...")
+global server
 
 def read_tfluna_data():
     time.sleep(1)
@@ -269,8 +274,20 @@ def capture_and_detect():
         i += 1
         time.sleep(5)
 
-def main():
+async def main():
     try:
+        loop = asyncio.get_running_loop()
+        server = ble_server.SafePiBLEServer(loop)
+        server.start()
+        
+        print("Waiting for client to write something...")
+        if server.trigger.__module__ == "threading":
+            await asyncio.to_thread(server.trigger.wait)
+        else:
+            await server.trigger.wait()
+
+        print("Client connected and sent data.")
+        
         capture_and_detect()
     except KeyboardInterrupt:
         print("\nStopping program...")
