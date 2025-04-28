@@ -63,7 +63,7 @@ stereo = cv2.StereoSGBM_create(
 # Setup matplotlib plot
 plt.ion()
 fig, ax = plt.subplots(figsize=(8, 6))
-disp_plot = ax.imshow(np.zeros((img_size[1], img_size[0])), cmap='plasma')
+disp_plot = ax.imshow(np.zeros((img_size[1], img_size[0], 3), dtype=np.uint8))
 fig.colorbar(disp_plot)
 ax.set_title('Disparity Map')
 ax.axis('off')
@@ -163,11 +163,16 @@ def capture_and_detect():
 
         print("Computing depth map...")
         disparity = compute_depth_map(imgL, imgR)
+
+        # Normalize disparity for visualization
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         disp_vis = np.uint8(disp_vis)
 
-        disp_plot.set_data(disp_vis)
-        disp_plot.set_clim(vmin=np.min(disp_vis), vmax=np.max(disp_vis))
+        # Apply a color map (JET) to the disparity for better visualization
+        disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
+
+        # Update matplotlib plot
+        disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
         fig.canvas.draw()
         fig.canvas.flush_events()
 
@@ -224,6 +229,7 @@ def capture_and_detect():
 
         i += 1
         time.sleep(5)
+
 
 def main():
     try:
