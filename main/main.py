@@ -279,18 +279,10 @@ async def main():
     try:
         loop = asyncio.get_running_loop()
         server = ble_server.SafePiBLEServer(loop)
-        await server.start()
- 
-        print("Waiting for client to write something...")
-        if server.trigger.__module__ == "threading":
-            await asyncio.to_thread(server.trigger.wait)
-        else:
-            await server.trigger.wait()
- 
-        print("Client connected and sent data.")
-        await server.send_message("Hi PWA!")
- 
-        await capture_and_detect(server)
+        await server.start()         
+        
+        task = asyncio.create_task(capture_and_detect(server))
+        await task
     except KeyboardInterrupt:
         print("\nStopping program...")
     finally:
