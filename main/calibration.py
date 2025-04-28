@@ -5,7 +5,7 @@ import sys
 
 
 chessboard_size = (10, 7)
-square_size = 0.016
+square_size = 0.02
 image_format = 'jpg'
 
 objp = np.zeros((chessboard_size[0]*chessboard_size[1], 3), np.float32)

@@ -1,6 +1,7 @@
 import serial
 import time
 ser = serial.Serial("/dev/ttyAMA0", 115200)
+
 # we define a new function that will get the data from LiDAR and publish it
 def read_data():
     time.sleep(1)  # Sleep 1000ms
@@ -41,7 +42,9 @@ def read_data():
 if __name__ == "__main__":
     try:
         if ser.isOpen() == False:
+            print("opening serial")
             ser.open()
+        print("reading data")
         read_data()
     except KeyboardInterrupt:
         if ser != None:
