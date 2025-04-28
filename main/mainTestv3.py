@@ -1,11 +1,9 @@
-import asyncio
 import serial
 import time
 import cv2
 from picamera2 import Picamera2
 from libcamera import controls
 from ultralytics import YOLO
-from ble_server import SafePiBLEServer  # Ensure this module exists
 import numpy as np
 
 # Initialize hardware
@@ -24,8 +22,8 @@ print("Initializing TF-Luna LiDAR...")
 ser = serial.Serial("/dev/ttyAMA0", 115200)
 
 print("Loading YOLO models...")
-model_general = YOLO("yolo11s.pt")           # COCO (people, cars, etc.)
-model_crosswalk = YOLO("yolov8n.pt")  # Your crosswalk model
+model_general = YOLO("yolo11s.pt")          # COCO (people, cars, etc.)
+model_crosswalk = YOLO("yolov8n.pt")         # Your crosswalk model
 
 # Load stereo calibration data
 calib = np.load("stereo_calib_data.npz")
@@ -80,9 +78,10 @@ def get_object_distance(bbox, disparity_map, Q):
     center_y = (y1 + y2) // 2
     return points_3D[center_y, center_x][2] * 100  # meters to cm
 
-async def capture_and_detect(server):
+def capture_and_detect():
     i = 0
     while True:
+        print(f"\n--- Capture {i} ---")
         print("Capturing images...")
         imgL = camera1.capture_array()
         imgR = camera2.capture_array()
@@ -113,7 +112,7 @@ async def capture_and_detect(server):
             distance_cm = get_object_distance((x1, y1, x2, y2), disparity, Q)
 
             if distance_cm is None:
-                lidar_data = await asyncio.to_thread(read_tfluna_data)
+                lidar_data = read_tfluna_data()
                 if lidar_data:
                     distance_cm = lidar_data["distance"]
 
@@ -135,7 +134,7 @@ async def capture_and_detect(server):
             distance_cm = get_object_distance((x1, y1, x2, y2), disparity, Q)
 
             if distance_cm is None:
-                lidar_data = await asyncio.to_thread(read_tfluna_data)
+                lidar_data = read_tfluna_data()
                 if lidar_data:
                     distance_cm = lidar_data["distance"]
 
@@ -145,40 +144,26 @@ async def capture_and_detect(server):
                     "distance_cm": round(distance_cm, 1)
                 })
 
-        print("Detected obstacles:", detected_obstacles)
-
         if detected_obstacles:
-            message = {"obstacles": detected_obstacles}
-            await server.send_message(str(message).replace("'", '"'))
+            print("\nDetected Obstacles:")
+            for obs in detected_obstacles:
+                print(f"  - {obs['label']}: {obs['distance_cm']} cm")
         else:
-            await server.send_message('"status": "No nearby obstacles"')
+            print("No nearby obstacles detected.")
 
         i += 1
-        await asyncio.sleep(5)
+        time.sleep(5)
 
-async def main():
-    loop = asyncio.get_running_loop()
-    server = SafePiBLEServer(loop)
-    await server.start()
-
-    print("Waiting for client to write something...")
-    if server.trigger.__module__ == "threading":
-        await asyncio.to_thread(server.trigger.wait)
-    else:
-        await server.trigger.wait()
-
-    print("Client connected and sent data.")
-    await server.send_message("Hi PWA!")
-
-    await capture_and_detect(server)
-
-if __name__ == "__main__":
+def main():
     try:
-        asyncio.run(main())
+        capture_and_detect()
     except KeyboardInterrupt:
-        print("Stopping program...")
+        print("\nStopping program...")
     finally:
         camera1.stop()
         camera2.stop()
         ser.close()
         print("Cameras and LiDAR stopped.")
+
+if __name__ == "__main__":
+    main()
