@@ -28,11 +28,42 @@ model_crosswalk = YOLO("yolov8n.pt")         # Your crosswalk model
 
 # Load stereo calibration data
 calib = np.load("stereo_calib_data.npz")
-Q = calib["Q"]
+mtxL, distL = calib['mtxL'], calib['distL']
+mtxR, distR = calib['mtxR'], calib['distR']
+R, T = calib['R'], calib['T']
+Q = calib['Q']
 
+# Get image size
+frameL = camera1.capture_array()
+frameR = camera2.capture_array()
+img_size = (frameL.shape[1], frameL.shape[0])
+
+# Stereo rectify
+R1, R2, P1, P2, Q, _, _ = cv2.stereoRectify(mtxL, distL, mtxR, distR, img_size, R, T)
+
+# Precompute rectification maps
+mapLx, mapLy = cv2.initUndistortRectifyMap(mtxL, distL, R1, P1, img_size, cv2.CV_32FC1)
+mapRx, mapRy = cv2.initUndistortRectifyMap(mtxR, distR, R2, P2, img_size, cv2.CV_32FC1)
+
+# StereoSGBM matcher
+stereo = cv2.StereoSGBM_create(
+    minDisparity=0,
+    numDisparities=16 * 8,
+    blockSize=3,
+    P1=8 * 3 * 3 ** 2,
+    P2=32 * 3 * 3 ** 2,
+    disp12MaxDiff=1,
+    uniquenessRatio=10,
+    speckleWindowSize=100,
+    speckleRange=2,
+    preFilterCap=63,
+    mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY
+)
+
+# Setup matplotlib plot
 plt.ion()
 fig, ax = plt.subplots(figsize=(8, 6))
-disp_plot = ax.imshow(np.zeros((480, 640)), cmap='plasma')
+disp_plot = ax.imshow(np.zeros((img_size[1], img_size[0])), cmap='plasma')
 fig.colorbar(disp_plot)
 ax.set_title('Disparity Map')
 ax.axis('off')
@@ -59,16 +90,12 @@ def read_tfluna_data():
     return output
 
 def compute_depth_map(imgL, imgR):
-    stereo = cv2.StereoSGBM_create(
-        minDisparity=0,
-        numDisparities=16 * 5,
-        blockSize=5,
-        P1=8 * 3 * 5 ** 2,
-        P2=32 * 3 * 5 ** 2,
-        mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY
-    )
-    grayL = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
-    grayR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
+    rectL = cv2.remap(imgL, mapLx, mapLy, cv2.INTER_LINEAR)
+    rectR = cv2.remap(imgR, mapRx, mapRy, cv2.INTER_LINEAR)
+    
+    grayL = cv2.cvtColor(rectL, cv2.COLOR_BGR2GRAY)
+    grayR = cv2.cvtColor(rectR, cv2.COLOR_BGR2GRAY)
+
     disparity = stereo.compute(grayL, grayR).astype(np.float32) / 16.0
     return disparity
 
@@ -76,16 +103,14 @@ def get_object_distance(bbox, disparity_map, Q):
     x1, y1, x2, y2 = map(int, bbox)
     region = disparity_map[y1:y2, x1:x2]
 
-    # Only keep disparity values in a reasonable range
     valid_disp_min = 1
-    valid_disp_max = 128  # Adjust based on your stereo config
+    valid_disp_max = 128
 
     mask = (region > valid_disp_min) & (region < valid_disp_max)
 
     if np.count_nonzero(mask) == 0:
         return None
 
-    # Median disparity of valid region
     disp_valid = region[mask]
     median_disp = np.median(disp_valid)
 
@@ -94,24 +119,20 @@ def get_object_distance(bbox, disparity_map, Q):
     center_x = (x1 + x2) // 2
     center_y = (y1 + y2) // 2
 
-    # Check center pixel disparity too
     center_disp = disparity_map[center_y, center_x]
 
     distance_from_center = None
     if valid_disp_min < center_disp < valid_disp_max:
         point_center = points_3D[center_y, center_x]
-        distance_from_center = point_center[2] * 100  # meters to cm
+        distance_from_center = point_center[2] * 100
 
-    # Also compute distance from median disparity
     if median_disp > 0:
-        # Need to project a fake disparity map where everything is median_disp
         temp_disp_map = np.full_like(disparity_map, median_disp)
         points_median = cv2.reprojectImageTo3D(temp_disp_map, Q)
-        distance_from_median = points_median[center_y, center_x][2] * 100  # meters to cm
+        distance_from_median = points_median[center_y, center_x][2] * 100
     else:
         distance_from_median = None
 
-    # Choose the best
     distances = []
     if distance_from_center is not None and 0 < distance_from_center < 5000:
         distances.append(distance_from_center)
@@ -144,15 +165,14 @@ def capture_and_detect():
         disparity = compute_depth_map(imgL, imgR)
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         disp_vis = np.uint8(disp_vis)
-        
+
         disp_plot.set_data(disp_vis)
-        disp_plot.set_clim(vmin=np.min(disp_vis), vmax=np.max(disp_vis))  # Optional: auto-contrast
+        disp_plot.set_clim(vmin=np.min(disp_vis), vmax=np.max(disp_vis))
         fig.canvas.draw()
         fig.canvas.flush_events()
 
         detected_obstacles = []
 
-        # Process general objects (people, cars, etc.)
         for box in results_general.boxes:
             cls_id = int(box.cls[0])
             label = model_general.names[cls_id]
@@ -174,7 +194,6 @@ def capture_and_detect():
                     "distance_cm": round(distance_cm, 1)
                 })
 
-        # Process crosswalks separately
         for box in results_crosswalk.boxes:
             cls_id = int(box.cls[0])
             label = model_crosswalk.names[cls_id]
@@ -190,7 +209,7 @@ def capture_and_detect():
                 if lidar_data:
                     distance_cm = lidar_data["distance"]
 
-            if distance_cm is not None and distance_cm < 500:  # Crosswalks might be further away
+            if distance_cm is not None and distance_cm < 500:
                 detected_obstacles.append({
                     "label": label,
                     "distance_cm": round(distance_cm, 1)
