@@ -3,8 +3,8 @@ import numpy as np
 import glob
 
 # Calibration settings
-board_size = (10, 7)  # (width, height) of inner checkerboard corners
-square_size = 0.016  # Real size of one square (in meters)
+board_size = (10, 7)
+square_size = 0.016  # meters
 
 # Prepare object points
 objp = np.zeros((board_size[0] * board_size[1], 3), np.float32)
@@ -12,12 +12,14 @@ objp[:, :2] = np.mgrid[0:board_size[0], 0:board_size[1]].T.reshape(-1, 2)
 objp *= square_size
 
 # Arrays to store points
-objpoints = []  # 3D points
-imgpointsL = [] # 2D points for left
-imgpointsR = [] # 2D points for right
+objpoints = []
+imgpointsL = []
+imgpointsR = []
 
 images_left = sorted(glob.glob("left/*.png"))
 images_right = sorted(glob.glob("right/*.png"))
+
+img_size = None
 
 for imgL_path, imgR_path in zip(images_left, images_right):
     imgL = cv2.imread(imgL_path)
@@ -25,6 +27,9 @@ for imgL_path, imgR_path in zip(images_left, images_right):
 
     grayL = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
     grayR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
+
+    if img_size is None:
+        img_size = grayL.shape[::-1]  # (width, height)
 
     retL, cornersL = cv2.findChessboardCorners(grayL, board_size, None)
     retR, cornersR = cv2.findChessboardCorners(grayR, board_size, None)
@@ -35,8 +40,8 @@ for imgL_path, imgR_path in zip(images_left, images_right):
         imgpointsR.append(cornersR)
 
 # Calibrate individual cameras
-retL, mtxL, distL, _, _ = cv2.calibrateCamera(objpoints, imgpointsL, grayL.shape[::-1], None, None)
-retR, mtxR, distR, _, _ = cv2.calibrateCamera(objpoints, imgpointsR, grayR.shape[::-1], None, None)
+retL, mtxL, distL, _, _ = cv2.calibrateCamera(objpoints, imgpointsL, img_size, None, None)
+retR, mtxR, distR, _, _ = cv2.calibrateCamera(objpoints, imgpointsR, img_size, None, None)
 
 # Stereo calibration
 flags = cv2.CALIB_FIX_INTRINSIC
@@ -46,7 +51,7 @@ retStereo, mtxL, distL, mtxR, distR, R, T, E, F = cv2.stereoCalibrate(
     objpoints, imgpointsL, imgpointsR,
     mtxL, distL,
     mtxR, distR,
-    grayL.shape[::-1],
+    img_size,
     criteria=criteria,
     flags=flags
 )
