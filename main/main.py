@@ -149,7 +149,7 @@ def get_object_distance(bbox, disparity_map, Q):
     else:
         return None
 
-def capture_and_detect(server):
+async def capture_and_detect(server):
     i = 0
     while True:
         print(f"\n--- Capture {i} ---")
@@ -270,7 +270,7 @@ def capture_and_detect(server):
         print("\nClosest Object Detected:")
         print(f"  Label: {closest_object['label']}")
         print(f"  Distance: {round(closest_object['distance_cm'], 1)} cm")
-        server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'], 1) / 100} meters away")
+        await server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'], 1) / 100} meters away")
 
         i += 1
         time.sleep(5)
