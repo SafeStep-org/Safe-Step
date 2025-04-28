@@ -6,18 +6,9 @@ import glob
 board_size = (10, 7)  # (width, height) of inner checkerboard corners
 square_size = 0.016  # Real size of one square (in meters)
 
-<<<<<<< HEAD
-chessboard_size = (10, 7)
-square_size = 0.02
-image_format = 'jpg'
-
-objp = np.zeros((chessboard_size[0]*chessboard_size[1], 3), np.float32)
-objp[:, :2] = np.mgrid[0:chessboard_size[0], 0:chessboard_size[1]].T.reshape(-1, 2)
-=======
 # Prepare object points
 objp = np.zeros((board_size[0] * board_size[1], 3), np.float32)
 objp[:, :2] = np.mgrid[0:board_size[0], 0:board_size[1]].T.reshape(-1, 2)
->>>>>>> 73063eeafcb6701c766282df8b5c57081f484fff
 objp *= square_size
 
 # Arrays to store points
