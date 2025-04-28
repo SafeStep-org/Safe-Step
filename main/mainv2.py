@@ -66,19 +66,56 @@ def compute_depth_map(imgL, imgR):
     return disparity
 
 def get_object_distance(bbox, disparity_map, Q):
-    x1, y1, x2, y2 = map(int, bbox)
+    x1, y1, x2, x2 = map(int, bbox)
     region = disparity_map[y1:y2, x1:x2]
-    mask = region > 0
+
+    # Only keep disparity values in a reasonable range
+    valid_disp_min = 1
+    valid_disp_max = 128  # Adjust based on your stereo config
+
+    mask = (region > valid_disp_min) & (region < valid_disp_max)
+
     if np.count_nonzero(mask) == 0:
         return None
+
+    # Median disparity of valid region
     disp_valid = region[mask]
-    avg_disp = np.median(disp_valid)
-    if avg_disp <= 0:
-        return None
+    median_disp = np.median(disp_valid)
+
     points_3D = cv2.reprojectImageTo3D(disparity_map, Q)
+
     center_x = (x1 + x2) // 2
     center_y = (y1 + y2) // 2
-    return points_3D[center_y, center_x][2] * 100  # meters to cm
+
+    # Check center pixel disparity too
+    center_disp = disparity_map[center_y, center_x]
+
+    distance_from_center = None
+    if valid_disp_min < center_disp < valid_disp_max:
+        point_center = points_3D[center_y, center_x]
+        distance_from_center = point_center[2] * 100  # meters to cm
+
+    # Also compute distance from median disparity
+    if median_disp > 0:
+        # Need to project a fake disparity map where everything is median_disp
+        temp_disp_map = np.full_like(disparity_map, median_disp)
+        points_median = cv2.reprojectImageTo3D(temp_disp_map, Q)
+        distance_from_median = points_median[center_y, center_x][2] * 100  # meters to cm
+    else:
+        distance_from_median = None
+
+    # Choose the best
+    distances = []
+    if distance_from_center is not None and 0 < distance_from_center < 5000:
+        distances.append(distance_from_center)
+    if distance_from_median is not None and 0 < distance_from_median < 5000:
+        distances.append(distance_from_median)
+
+    if distances:
+        return np.median(distances)
+    else:
+        return None
+
 
 async def capture_and_detect(server):
     i = 0
@@ -95,6 +132,12 @@ async def capture_and_detect(server):
 
         print("Computing depth map...")
         disparity = compute_depth_map(imgL, imgR)
+        
+        # Visualize disparity map
+        disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+        disp_vis = np.uint8(disp_vis)
+        cv2.imshow("Disparity Map", disp_vis)
+        cv2.waitKey(1)
 
         detected_obstacles = []
 
