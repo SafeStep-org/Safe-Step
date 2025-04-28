@@ -16,8 +16,8 @@ objpoints = []
 imgpointsL = []
 imgpointsR = []
 
-images_left = sorted(glob.glob("left/*.png"))
-images_right = sorted(glob.glob("right/*.png"))
+images_left = sorted(glob.glob("left/*.jpg"))
+images_right = sorted(glob.glob("right/*.jpg"))
 
 img_size = None
 
