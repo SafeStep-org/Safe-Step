@@ -66,17 +66,32 @@ def compute_depth_map(imgL, imgR):
 def get_object_distance(bbox, disparity_map, Q):
     x1, y1, x2, y2 = map(int, bbox)
     region = disparity_map[y1:y2, x1:x2]
-    mask = region > 0
+    mask = (region > 1) & (region < 128)  # example thresholds
+    
     if np.count_nonzero(mask) == 0:
         return None
+    
     disp_valid = region[mask]
     avg_disp = np.median(disp_valid)
+    
     if avg_disp <= 0:
         return None
+    
     points_3D = cv2.reprojectImageTo3D(disparity_map, Q)
     center_x = (x1 + x2) // 2
     center_y = (y1 + y2) // 2
-    return points_3D[center_y, center_x][2] * 100  # meters to cm
+    center_disp = disparity_map[center_y, center_x]
+    
+    if center_disp <= 0:
+        return None
+    
+    distance = points_3D[center_y, center_x][2] * 100  # meters to cm
+    
+    # Only trust distance if it’s reasonable
+    if distance < 0 or distance > 5000:  # 50 meters maximum
+        return None
+    
+    return distance
 
 def capture_and_detect():
     i = 0
