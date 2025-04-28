@@ -153,7 +153,6 @@ def capture_and_detect():
         imgR = camera2.capture_array()
 
         imgL_rgb = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)
-        imgR_rgb = cv2.cvtColor(imgR, cv2.COLOR_BGR2RGB)
 
         print("Running object detection (YOLO11s)...")
         results_general = model_general(imgL_rgb)[0]
@@ -167,68 +166,67 @@ def capture_and_detect():
         # Normalize disparity for visualization
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         disp_vis = np.uint8(disp_vis)
-
-        # Apply a color map (JET) to the disparity for better visualization
         disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
 
-        # Update matplotlib plot
         disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
         fig.canvas.draw()
         fig.canvas.flush_events()
 
-        detected_obstacles = []
+        # Step 1: Find closest point in disparity map
+        valid_disp_min = 1
+        valid_disp_max = 128
+        mask_valid = (disparity > valid_disp_min) & (disparity < valid_disp_max)
 
-        for box in results_general.boxes:
-            cls_id = int(box.cls[0])
-            label = model_general.names[cls_id]
-            conf = float(box.conf[0])
-            if conf < 0.5:
-                continue
+        if not np.any(mask_valid):
+            print("No valid disparity points found.")
+            i += 1
+            time.sleep(5)
+            continue
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            distance_cm = get_object_distance((x1, y1, x2, y2), disparity, Q)
+        min_disp_idx = np.unravel_index(np.argmax(mask_valid * disparity), disparity.shape)
+        center_y, center_x = min_disp_idx
 
-            if distance_cm is None:
-                lidar_data = read_tfluna_data()
-                if lidar_data:
-                    distance_cm = lidar_data["distance"]
+        points_3D = cv2.reprojectImageTo3D(disparity, Q)
+        point_3D = points_3D[center_y, center_x]
+        distance_cm = point_3D[2] * 100  # meters to centimeters
 
-            if distance_cm is not None and distance_cm < 200:
-                detected_obstacles.append({
-                    "label": label,
-                    "distance_cm": round(distance_cm, 1)
-                })
+        if distance_cm <= 0 or distance_cm > 5000:
+            print("Depth map distance invalid or too far.")
+            i += 1
+            time.sleep(5)
+            continue
 
-        for box in results_crosswalk.boxes:
-            cls_id = int(box.cls[0])
-            label = model_crosswalk.names[cls_id]
-            conf = float(box.conf[0])
-            if conf < 0.5:
-                continue
+        # Step 2: See if the point falls inside any YOLO bounding box
+        matched_label = "obstacle"
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            distance_cm = get_object_distance((x1, y1, x2, y2), disparity, Q)
+        for results, model in [(results_general, model_general), (results_crosswalk, model_crosswalk)]:
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                if x1 <= center_x <= x2 and y1 <= center_y <= y2:
+                    cls_id = int(box.cls[0])
+                    matched_label = model.names[cls_id]
+                    break
+            if matched_label != "obstacle":
+                break
 
-            if distance_cm is None:
-                lidar_data = read_tfluna_data()
-                if lidar_data:
-                    distance_cm = lidar_data["distance"]
+        # Step 3: Cross-check with TF-Luna LiDAR
+        lidar_data = read_tfluna_data()
+        if lidar_data:
+            lidar_distance_cm = lidar_data["distance"]
+            if abs(lidar_distance_cm - distance_cm) > 100:  # allow ±100 cm difference
+                print(f"Depth map distance ({distance_cm:.1f} cm) does not match LiDAR ({lidar_distance_cm:.1f} cm). Using LiDAR reading.")
+                distance_cm = lidar_distance_cm
+            else:
+                print(f"Depth map and LiDAR distances match within tolerance.")
 
-            if distance_cm is not None and distance_cm < 500:
-                detected_obstacles.append({
-                    "label": label,
-                    "distance_cm": round(distance_cm, 1)
-                })
-
-        if detected_obstacles:
-            print("\nDetected Obstacles:")
-            for obs in detected_obstacles:
-                print(f"  - {obs['label']}: {obs['distance_cm']} cm")
-        else:
-            print("No nearby obstacles detected.")
+        # Step 4: Report the closest object
+        print("\nClosest Object Detected:")
+        print(f"  Label: {matched_label}")
+        print(f"  Distance: {round(distance_cm, 1)} cm")
 
         i += 1
         time.sleep(5)
+
 
 
 def main():
