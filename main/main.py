@@ -71,7 +71,7 @@ ax.axis('off')
 fig.tight_layout()
 
 print("Starting BLE Server...")
-global server
+
 
 def read_tfluna_data():
     time.sleep(1)
@@ -149,7 +149,7 @@ def get_object_distance(bbox, disparity_map, Q):
     else:
         return None
 
-def capture_and_detect():
+def capture_and_detect(server):
     i = 0
     while True:
         print(f"\n--- Capture {i} ---")
@@ -270,6 +270,7 @@ def capture_and_detect():
         print("\nClosest Object Detected:")
         print(f"  Label: {closest_object['label']}")
         print(f"  Distance: {round(closest_object['distance_cm'], 1)} cm")
+        server.send_message(f"{closest_object['label']} found {closest_object['distance'] / 100} meters away")
 
         i += 1
         time.sleep(5)
@@ -279,16 +280,17 @@ async def main():
         loop = asyncio.get_running_loop()
         server = ble_server.SafePiBLEServer(loop)
         await server.start()
-        
+ 
         print("Waiting for client to write something...")
         if server.trigger.__module__ == "threading":
             await asyncio.to_thread(server.trigger.wait)
         else:
             await server.trigger.wait()
-
+ 
         print("Client connected and sent data.")
-        
-        capture_and_detect()
+        await server.send_message("Hi PWA!")
+ 
+        await capture_and_detect(server)
     except KeyboardInterrupt:
         print("\nStopping program...")
     finally:
