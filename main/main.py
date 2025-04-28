@@ -278,7 +278,7 @@ async def main():
     try:
         loop = asyncio.get_running_loop()
         server = ble_server.SafePiBLEServer(loop)
-        server.start()
+        await server.start()
         
         print("Waiting for client to write something...")
         if server.trigger.__module__ == "threading":
@@ -298,4 +298,7 @@ async def main():
         print("Cameras and LiDAR stopped.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Shutting down...")
