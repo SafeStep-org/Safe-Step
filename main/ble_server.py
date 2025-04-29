@@ -12,6 +12,8 @@ from bless import (
     GATTAttributePermissions,
 )
 
+from main import take_picture
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,9 @@ class SafePiBLEServer:
         if(message == 'shutdown'):
             subprocess.run(["shutdown", "now"])
         
+        if(message == 'takePicture'):
+            take_picture()
+        
         self.characteristic.value = value
         logger.info(f"Updated value to ${message}")
         
@@ -78,6 +83,7 @@ class SafePiBLEServer:
         if self.characteristic:
             self.characteristic.value = msg.encode('utf-8')
             self.server.update_value(self.service_uuid, self.char_uuid)
+            
             await asyncio.sleep(0)
             logger.info(f"Sent to client: {msg}")
         else:

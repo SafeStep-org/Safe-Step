@@ -8,6 +8,7 @@ from ultralytics import YOLO
 import numpy as np
 import matplotlib.pyplot as plt
 import ble_server
+import time
 
 # Initialize hardware
 print("Initializing cameras...")
@@ -148,6 +149,10 @@ def get_object_distance(bbox, disparity_map, Q):
         return np.median(distances)
     else:
         return None
+    
+def take_picture():
+    img = camera1.capture_array()
+    cv2.imwrite(f'pictures/{time.time()}.jpg', img)
 
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
@@ -156,7 +161,6 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         print("Capturing images...")
         imgL = camera1.capture_array()
         imgR = camera2.capture_array()
-
         imgL_rgb = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)
 
         print("Running object detection (YOLO11s)...")
