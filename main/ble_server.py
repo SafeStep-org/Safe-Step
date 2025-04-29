@@ -62,6 +62,7 @@ class SafePiBLEServer:
 
     async def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
         message = value.decode('utf-8')
+        logger.info(f">>>> write_request triggered!")
         logger.info(f"Received from client: {message}")
         
         if(message == 'shutdown'):

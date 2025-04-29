@@ -75,7 +75,6 @@ print("Starting BLE Server...")
 
 
 def read_tfluna_data():
-    time.sleep(1)
     output = {}
     counter = ser.in_waiting
     if counter > 8:
@@ -166,12 +165,15 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
 
         print("Running object detection (YOLO11s)...")
         results_general = model_general(imgL_rgb)[0]
+        asyncio.sleep(0)
 
         print("Running crosswalk detection (YOLOv8n)...")
         results_crosswalk = model_crosswalk(imgL_rgb)[0]
+        asyncio.sleep(0)
 
         print("Computing depth map...")
         disparity = compute_depth_map(imgL, imgR)
+        asyncio.sleep(0)
 
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         disp_vis = np.uint8(disp_vis)
@@ -227,7 +229,6 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             if not np.any(mask_valid):
                 print("No valid disparity points found.")
                 i += 1
-                time.sleep(5)
                 continue
         
             # Find the valid pixel with the minimum Z-distance (closest)
@@ -242,13 +243,11 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             if distance_cm <= 21.0:
                 print(f"Closest point ({distance_cm:.1f} cm) is likely border noise. Skipping...")
                 i += 1
-                time.sleep(5)
                 continue
         
             if distance_cm <= 0 or distance_cm > 5000:
                 print("Depth map distance invalid or too far.")
                 i += 1
-                time.sleep(5)
                 continue
         
             detected_objects.append({
@@ -279,17 +278,16 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         await asyncio.sleep(0)
 
         i += 1
-        time.sleep(1)
 
 async def main():
     try:
         loop = asyncio.get_running_loop()
         server = ble_server.SafePiBLEServer(loop)
-        
+
+        server.register_callback(take_picture)        
         await server.start()
-        server.register_callback(take_picture)
                  
-        await capture_and_detect(server)
+        capture_and_detect(server)
     except KeyboardInterrupt:
         print("\nStopping program...")
     finally:
