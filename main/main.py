@@ -294,7 +294,7 @@ async def main():
         server.register_callback(take_picture)        
         await server.start()
                  
-        capture_and_detect(server)
+        await capture_and_detect(server)
     except KeyboardInterrupt:
         print("\nStopping program...")
     finally:
