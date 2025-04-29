@@ -12,10 +12,9 @@ from bless import (
     GATTAttributePermissions,
 )
 
-from main import take_picture
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+callback = None
 
 class SafePiBLEServer:
     def __init__(self, loop: asyncio.AbstractEventLoop):
@@ -61,7 +60,7 @@ class SafePiBLEServer:
         logger.debug(f"Reading {characteristic.value}")
         return characteristic.value
 
-    def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
+    async def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
         message = value.decode('utf-8')
         logger.info(f"Received from client: {message}")
         
@@ -69,10 +68,13 @@ class SafePiBLEServer:
             subprocess.run(["shutdown", "now"])
         
         if(message == 'takePicture'):
-            take_picture()
+            logger.info('taking picture')
+            await callback()
         
         self.characteristic.value = value
         logger.info(f"Updated value to ${message}")
+        
+        await asyncio.sleep(0)
         
         if self.trigger .__module__ == "threading":
             self.trigger.set()
@@ -88,3 +90,7 @@ class SafePiBLEServer:
             logger.info(f"Sent to client: {msg}")
         else:
             logger.warning("No client connected; message not sent.")
+            
+    def register_callback(self, cb):
+        global callback
+        callback = cb
