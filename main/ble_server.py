@@ -78,6 +78,7 @@ class SafePiBLEServer:
         if self.characteristic:
             self.characteristic.value = msg.encode('utf-8')
             self.server.update_value(self.service_uuid, self.char_uuid)
+            await asyncio.sleep(0)
             logger.info(f"Sent to client: {msg}")
         else:
             logger.warning("No client connected; message not sent.")

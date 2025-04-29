@@ -270,7 +270,8 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         print("\nClosest Object Detected:")
         print(f"  Label: {closest_object['label']}")
         print(f"  Distance: {round(closest_object['distance_cm'], 1)} cm")
-        await server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'], 1) / 100} meters away")
+        await server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'] / 100, 1)} meters away")
+        await asyncio.sleep(0)
 
         i += 1
         time.sleep(1)
