@@ -63,7 +63,6 @@ stereo = cv2.StereoSGBM_create(
 )
 
 HAZARD_DISTANCE_CM = 500 
-last_hazards = []
 
 def read_tfluna_data():
     output = {}
@@ -155,14 +154,6 @@ def get_direction(x_center, image_width):
 
 def is_hazard(obj):
     return obj["distance_cm"] < HAZARD_DISTANCE_CM
-
-def is_similar_hazard(new, old, distance_tolerance=25):
-    return (
-        new["label"] == old["label"] and
-        new["direction"] == old["direction"] and
-        abs(new["distance_cm"] - old["distance_cm"]) < distance_tolerance
-    )
-
 
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
@@ -280,21 +271,18 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                 
         hazards = [obj for obj in detected_objects if is_hazard(obj)]
 
-        new_reports = []
-        for hazard in hazards:
-            if not any(is_similar_hazard(hazard, prev) for prev in last_hazards):
-                new_reports.append(hazard)
+        if not hazards:
+            print("No hazards detected.")
+            await asyncio.sleep(0)
+            continue
 
-        # Report only new hazards
-        for hazard in new_reports:
-            label = hazard["label"]
-            dist = round(hazard["distance_cm"] / 100, 1)
-            direction = hazard["direction"]
-            print(f"Hazard: {label} {dist}m to the {direction}")
-            await server.send_message(f"{label} {dist}m to the {direction}")
-
-        # Update memory
-        last_hazards = new_reports
+        # Step 5: Report
+        print("\nClosest Object Detected:")
+        print(f"Label: {closest_object['label']}")
+        print(f"Distance: {round(closest_object['distance_cm'], 1)} cm")
+        print(f"Direction: {closest_object['direction']}")
+        await server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'] / 100, 1)} meters {closest_object['direction']}")
+        await asyncio.sleep(0)
 
         i += 1
 
