@@ -1,58 +1,59 @@
 import cv2
 import numpy as np
-import glob
 import os
+from pathlib import Path
 
-# Load the ONNX model
-net = cv2.dnn.readNetFromONNX("Crosswalks_ONNX_Model.onnx")
+# === CONFIG ===
+MODEL_PATH = "Crosswalks_ONNX_Model.onnx"
+INPUT_DIR = "testIMG/images"
+OUTPUT_DIR = "crosswalk_output"
+INPUT_SIZE = 512
+CONF_THRESHOLD = 0.3
 
-# Set input dimensions expected by the model
-INPUT_WIDTH = 512
-INPUT_HEIGHT = 512
-CONFIDENCE_THRESHOLD = 0.5
+# Create output directory if not exists
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Directory with JPEG images
-image_dir = "testIMG/images"
-output_dir = "crosswalk_output"
-os.makedirs(output_dir, exist_ok=True)
+# Load ONNX model
+net = cv2.dnn.readNetFromONNX(MODEL_PATH)
 
-# Process all JPEG images
-for image_path in glob.glob(os.path.join(image_dir, "*.jpeg")):
-    print(f"Processing {image_path}...")
+# Process each JPEG in the input directory
+for img_file in Path(INPUT_DIR).glob("*.jpeg"):
+    print(f"Processing: {img_file.name}")
 
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"Failed to read image {image_path}")
-        continue
-
-    orig_h, orig_w = image.shape[:2]
-
-    # Preprocess
-    blob = cv2.dnn.blobFromImage(image, 1/255.0, (INPUT_WIDTH, INPUT_HEIGHT), swapRB=True, crop=False)
+    # Read and resize image
+    img = cv2.imread(str(img_file))
+    img_resized = cv2.resize(img, (INPUT_SIZE, INPUT_SIZE))
+    blob = cv2.dnn.blobFromImage(img_resized, scalefactor=1/255.0, size=(INPUT_SIZE, INPUT_SIZE), swapRB=True, crop=False)
     net.setInput(blob)
 
-    # Run inference
-    outputs = net.forward()
+    # Forward pass
+    output = net.forward()
 
-    # You may need to adjust how predictions are parsed depending on model output format
-    # Here we assume output is [num_detections, 6] = [x, y, w, h, conf, class]
-    for detection in outputs[0]:
-        x, y, w, h, conf, cls = detection
-        if conf < CONFIDENCE_THRESHOLD:
+    # Output shape (1, 5, 5376) -> (5376, 5)
+    output = output.squeeze().transpose(1, 0)  # Now (5376, 5)
+
+    # Parse detections
+    boxes = []
+    h_orig, w_orig = img.shape[:2]
+    for det in output:
+        x, y, w, h, conf = det
+        if conf < CONF_THRESHOLD:
             continue
 
-        # Scale coordinates back to original image size
-        x = int((x - w / 2) * orig_w)
-        y = int((y - h / 2) * orig_h)
-        w = int(w * orig_w)
-        h = int(h * orig_h)
+        x1 = int((x - w / 2) * w_orig / INPUT_SIZE)
+        y1 = int((y - h / 2) * h_orig / INPUT_SIZE)
+        x2 = int((x + w / 2) * w_orig / INPUT_SIZE)
+        y2 = int((y + h / 2) * h_orig / INPUT_SIZE)
 
-        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.putText(image, f"{int(cls)} {conf:.2f}", (x, y - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        boxes.append((x1, y1, x2, y2, conf))
 
-    # Save result
-    filename = os.path.basename(image_path)
-    output_path = os.path.join(output_dir, filename)
-    cv2.imwrite(output_path, image)
-    print(f"Saved annotated image to {output_path}")
+    # Draw detections
+    for (x1, y1, x2, y2, conf) in boxes:
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(img, f"Crosswalk {conf:.2f}", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
+
+    # Save annotated image
+    out_path = Path(OUTPUT_DIR) / img_file.name
+    cv2.imwrite(str(out_path), img)
+
+print("✅ Processing complete.")
