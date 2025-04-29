@@ -18,8 +18,8 @@ camera2 = Picamera2(1)
 camera1.set_controls({"AfMode": controls.AfModeEnum.Continuous})
 camera2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
 
-camera1.start()
-camera2.start()
+camera1.start(show_preview=True)
+camera2.start(show_preview=True)
 print("Cameras initialized and started.")
 
 print("Initializing TF-Luna LiDAR...")
@@ -62,7 +62,17 @@ stereo = cv2.StereoSGBM_create(
     mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY
 )
 
-HAZARD_DISTANCE_CM = 500 
+# Setup matplotlib plot
+plt.ion()
+fig, ax = plt.subplots(figsize=(8, 6))
+disp_plot = ax.imshow(np.zeros((img_size[1], img_size[0], 3), dtype=np.uint8))
+fig.colorbar(disp_plot)
+ax.set_title('Disparity Map')
+ax.axis('off')
+fig.tight_layout()
+
+print("Starting BLE Server...")
+
 
 def read_tfluna_data():
     output = {}
@@ -143,17 +153,6 @@ async def take_picture():
     img = camera1.capture_array()
     cv2.imwrite(f'pictures/{time.time()}.jpg', img)
     await asyncio.sleep(0)
-    
-def get_direction(x_center, image_width):
-    if x_center < image_width / 3:
-        return "left"
-    elif x_center > 2 * image_width / 3:
-        return "right"
-    else:
-        return "ahead"
-
-def is_hazard(obj):
-    return obj["distance_cm"] < HAZARD_DISTANCE_CM
 
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
@@ -175,6 +174,14 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         print("Computing depth map...")
         disparity = compute_depth_map(imgL, imgR)
         asyncio.sleep(0)
+
+        disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+        disp_vis = np.uint8(disp_vis)
+        disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
+
+        disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
+        fig.canvas.draw()
+        fig.canvas.flush_events()
 
         detected_objects = []
 
@@ -208,16 +215,10 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                 if distance_cm <= 0 or distance_cm > 5000:
                     continue
 
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                center_x = (x1 + x2) // 2
-                direction = get_direction(center_x, imgL.shape[1])
-
                 detected_objects.append({
                     "label": label,
-                    "distance_cm": distance_cm,
-                    "direction": direction
+                    "distance_cm": distance_cm
                 })
-
 
         # Step 2: If no YOLO detections found, fallback to closest pixel
         if not detected_objects:
@@ -268,20 +269,12 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                 closest_object["distance_cm"] = lidar_distance_cm
             else:
                 print("Depth map and LiDAR distances match within tolerance.")
-                
-        hazards = [obj for obj in detected_objects if is_hazard(obj)]
-
-        if not hazards:
-            print("No hazards detected.")
-            await asyncio.sleep(0)
-            continue
 
         # Step 5: Report
         print("\nClosest Object Detected:")
-        print(f"Label: {closest_object['label']}")
-        print(f"Distance: {round(closest_object['distance_cm'], 1)} cm")
-        print(f"Direction: {closest_object['direction']}")
-        await server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'] / 100, 1)} meters {closest_object['direction']}")
+        print(f"  Label: {closest_object['label']}")
+        print(f"  Distance: {round(closest_object['distance_cm'], 1)} cm")
+        await server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'] / 100, 1)} meters away")
         await asyncio.sleep(0)
 
         i += 1
