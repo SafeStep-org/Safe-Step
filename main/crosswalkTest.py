@@ -4,7 +4,7 @@ import glob
 import os
 
 # Load the ONNX model
-net = cv2.dnn.readNetFromONNX("crosswalk_model.onnx")
+net = cv2.dnn.readNetFromONNX("Crosswalks_ONNX_Model.onnx")
 
 # Set input dimensions expected by the model
 INPUT_WIDTH = 512
