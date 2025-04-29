@@ -149,7 +149,7 @@ def get_object_distance(bbox, disparity_map, Q):
     else:
         return None
 
-async def capture_and_detect(server):
+async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
     while True:
         print(f"\n--- Capture {i} ---")
@@ -273,16 +273,15 @@ async def capture_and_detect(server):
         await server.send_message(f"{closest_object['label']} found {round(closest_object['distance_cm'], 1) / 100} meters away")
 
         i += 1
-        time.sleep(5)
+        time.sleep(1)
 
 async def main():
     try:
         loop = asyncio.get_running_loop()
         server = ble_server.SafePiBLEServer(loop)
-        await server.start()         
         
-        task = asyncio.create_task(capture_and_detect(server))
-        await task
+        await server.start()         
+        await capture_and_detect(server)
     except KeyboardInterrupt:
         print("\nStopping program...")
     finally:
