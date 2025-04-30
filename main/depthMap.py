@@ -30,12 +30,18 @@ mapRx, mapRy = cv2.initUndistortRectifyMap(mtxR, distR, R2, P2, img_size, cv2.CV
 # StereoSGBM matcher
 stereo = cv2.StereoSGBM_create(
     minDisparity=0,
-    numDisparities=16*5,
-    blockSize=5,
-    P1=8 * 3 * 5 ** 2,
-    P2=32 * 3 * 5 ** 2,
+    numDisparities=16*8,  # more disparities
+    blockSize=3,          # smaller blocks
+    P1=8 * 3 * 3**2,
+    P2=32 * 3 * 3**2,
+    disp12MaxDiff=1,      # left-right check
+    uniquenessRatio=10,   # better matching
+    speckleWindowSize=100,
+    speckleRange=2,
+    preFilterCap=63,
     mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY
 )
+
 
 print("Starting live depth map... (Press CTRL+C to stop)")
 
