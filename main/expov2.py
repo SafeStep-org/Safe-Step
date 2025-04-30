@@ -9,6 +9,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ble_server
 import atexit
+import threading
+import queue
+
+display_queue = queue.Queue(maxsize=2)
+stop_display_event = threading.Event()
 
 # === Initialize hardware ===
 print("Initializing cameras...")
@@ -94,6 +99,18 @@ async def take_picture():
     cv2.imwrite(f'pictures/{time.time()}.jpg', img)
     await asyncio.sleep(0)
 
+def display_thread_func():
+    while not stop_display_event.is_set():
+        try:
+            disp_color, annotated_img = display_queue.get(timeout=1)
+
+            disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
+            cam_plot.set_data(cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB))
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+
+        except queue.Empty:
+            continue
 
 # === Main Detection Loop with Optimizations ===
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
@@ -117,25 +134,12 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             disparity = compute_depth_map(imgL, imgR)
             await asyncio.sleep(0)
 
-            # Annotate image
-            annotated_img = imgL.copy()
-            for box in results.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                cls_id = int(box.cls[0])
-                label = model_general.names[cls_id]
-                conf = box.conf[0]
-                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(annotated_img, f"{label} {conf:.2f}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-            # Depth visualization
             disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
             disp_vis = np.uint8(disp_vis)
             disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
-
-            # Store last results
-            last_annotated_img = annotated_img
-            last_disp_color = disp_color
+        
+            if not display_queue.full():
+                display_queue.put((disp_color, annotated_img))
 
             # Distance estimation
             detected_objects = []
@@ -203,6 +207,8 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
 async def main():
     try:
         loop = asyncio.get_running_loop()
+        display_thread = threading.Thread(target=display_thread_func, daemon=True)
+        display_thread.start()
         server = ble_server.SafePiBLEServer(loop)
         server.register_callback(take_picture)
         await server.start()
@@ -214,6 +220,8 @@ async def main():
         camera2.stop()
         ser.close()
         atexit.register(lambda: plt.close('all'))
+        stop_display_event.set()
+        display_thread.join()
         print("Cameras and LiDAR stopped.")
 
 if __name__ == "__main__":
