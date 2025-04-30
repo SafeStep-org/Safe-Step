@@ -98,106 +98,106 @@ async def take_picture():
 # === Main Detection Loop with Optimizations ===
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
+    frame_skip = 3
+    last_annotated_img = np.zeros((480, 640, 3), dtype=np.uint8)
+    last_disp_color = np.zeros((480, 640, 3), dtype=np.uint8)
+
     while True:
-        print(f"\n--- Capture {i} ---")
+        print(f"\n--- Frame {i} ---")
         imgL = camera1.capture_array()
         imgR = camera2.capture_array()
         imgL_rgb = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)
 
-        print("Running YOLO11s detection...")
-        results = model_general(imgL_rgb)[0]
-        await asyncio.sleep(0)
+        if i % frame_skip == 0:
+            print("Running YOLO11s detection...")
+            results = model_general(imgL_rgb)[0]
+            await asyncio.sleep(0)
 
-        print("Computing depth map...")
-        disparity = compute_depth_map(imgL, imgR)
-        await asyncio.sleep(0)
+            print("Computing depth map...")
+            disparity = compute_depth_map(imgL, imgR)
+            await asyncio.sleep(0)
 
-        # Annotate the image
-        annotated_img = imgL.copy()
-        for box in results.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            cls_id = int(box.cls[0])
-            label = model_general.names[cls_id]
-            conf = box.conf[0]
-            cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(annotated_img, f"{label} {conf:.2f}", (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            # Annotate image
+            annotated_img = imgL.copy()
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                cls_id = int(box.cls[0])
+                label = model_general.names[cls_id]
+                conf = box.conf[0]
+                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(annotated_img, f"{label} {conf:.2f}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-        # Show updated image and disparity map every 2 frames
-        if i % 2 == 0:
-            # Depth Map visualization
+            # Depth visualization
             disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
             disp_vis = np.uint8(disp_vis)
             disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
 
-            disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
-            cam_plot.set_data(cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB))
-            fig.canvas.draw()
-            fig.canvas.flush_events()
+            # Store last results
+            last_annotated_img = annotated_img
+            last_disp_color = disp_color
 
-        # Depth estimation
-        detected_objects = []
-        valid_disp_min, valid_disp_max = 1, 128
-        points_3D = cv2.reprojectImageTo3D(disparity, Q)
+            # Distance estimation
+            detected_objects = []
+            valid_disp_min, valid_disp_max = 1, 128
+            points_3D = cv2.reprojectImageTo3D(disparity, Q)
 
-        for box in results.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            cls_id = int(box.cls[0])
-            label = model_general.names[cls_id]
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                cls_id = int(box.cls[0])
+                label = model_general.names[cls_id]
 
-            region = disparity[y1:y2, x1:x2]
-            mask = (region > valid_disp_min) & (region < valid_disp_max)
-            if not np.any(mask):
-                continue
+                region = disparity[y1:y2, x1:x2]
+                mask = (region > valid_disp_min) & (region < valid_disp_max)
+                if not np.any(mask):
+                    continue
 
-            median_disp = np.median(region[mask])
-            if median_disp <= 0:
-                continue
+                median_disp = np.median(region[mask])
+                if median_disp <= 0:
+                    continue
 
-            temp_disp_map = np.full_like(disparity, median_disp)
-            points_median = cv2.reprojectImageTo3D(temp_disp_map, Q)
-            center_x = (x1 + x2) // 2
-            center_y = (y1 + y2) // 2
-            distance_cm = points_median[center_y, center_x][2] * 100
+                temp_disp_map = np.full_like(disparity, median_disp)
+                points_median = cv2.reprojectImageTo3D(temp_disp_map, Q)
+                center_x = (x1 + x2) // 2
+                center_y = (y1 + y2) // 2
+                distance_cm = points_median[center_y, center_x][2] * 100
 
-            if 0 < distance_cm < 5000:
-                detected_objects.append({"label": label, "distance_cm": distance_cm})
+                if 0 < distance_cm < 5000:
+                    detected_objects.append({"label": label, "distance_cm": distance_cm})
 
-        # Fallback to closest disparity pixel
-        if not detected_objects:
-            print("No YOLO detections, checking closest disparity pixel...")
-            mask_valid = (disparity > valid_disp_min) & (disparity < valid_disp_max)
-            if np.any(mask_valid):
-                distances_cm = points_3D[:, :, 2] * 100
-                distances_cm_masked = np.where(mask_valid, distances_cm, np.inf)
-                min_idx = np.unravel_index(np.argmin(distances_cm_masked), distances_cm_masked.shape)
-                distance_cm = distances_cm[min_idx]
-                if 21.0 < distance_cm < 5000:
-                    detected_objects.append({"label": "obstacle", "distance_cm": distance_cm})
+            if not detected_objects:
+                print("No YOLO detections, checking closest disparity pixel...")
+                mask_valid = (disparity > valid_disp_min) & (disparity < valid_disp_max)
+                if np.any(mask_valid):
+                    distances_cm = points_3D[:, :, 2] * 100
+                    distances_cm_masked = np.where(mask_valid, distances_cm, np.inf)
+                    min_idx = np.unravel_index(np.argmin(distances_cm_masked), distances_cm_masked.shape)
+                    distance_cm = distances_cm[min_idx]
+                    if 21.0 < distance_cm < 5000:
+                        detected_objects.append({"label": "obstacle", "distance_cm": distance_cm})
 
-        if not detected_objects:
-            print("No valid depth or object detection.")
-            i += 1
-            continue
+            if detected_objects:
+                detected_objects.sort(key=lambda x: x["distance_cm"])
+                closest_object = detected_objects[0]
 
-        detected_objects.sort(key=lambda x: x["distance_cm"])
-        closest_object = detected_objects[0]
+                lidar_data = read_tfluna_data()
+                if lidar_data:
+                    lidar_distance = lidar_data["distance"]
+                    if abs(lidar_distance - closest_object["distance_cm"]) > 100:
+                        print(f"LiDAR discrepancy ({lidar_distance} cm), overriding.")
+                        closest_object["distance_cm"] = lidar_distance
 
-        # LiDAR correction
-        lidar_data = read_tfluna_data()
-        if lidar_data:
-            lidar_distance = lidar_data["distance"]
-            if abs(lidar_distance - closest_object["distance_cm"]) > 100:
-                print(f"Discrepancy with LiDAR ({lidar_distance} cm), overriding.")
-                closest_object["distance_cm"] = lidar_distance
+                print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm")
+                await server.send_message(f"{closest_object['label']} found {closest_object['distance_cm'] / 100:.1f} meters away")
 
-        print("\nClosest Object:")
-        print(f"  Label: {closest_object['label']}")
-        print(f"  Distance: {closest_object['distance_cm']:.1f} cm")
+        # Update plots on every frame
+        disp_plot.set_data(cv2.cvtColor(last_disp_color, cv2.COLOR_BGR2RGB))
+        cam_plot.set_data(cv2.cvtColor(last_annotated_img, cv2.COLOR_BGR2RGB))
+        fig.canvas.draw()
+        fig.canvas.flush_events()
 
-        await server.send_message(f"{closest_object['label']} found {closest_object['distance_cm'] / 100:.1f} meters away")
-        await asyncio.sleep(0)
         i += 1
+        await asyncio.sleep(0)
 
 # === Main Entrypoint ===
 async def main():
