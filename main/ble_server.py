@@ -65,13 +65,6 @@ class SafePiBLEServer:
         logger.info(f">>>> write_request triggered!")
         logger.info(f"Received from client: {message}")
         
-        if(message == 'shutdown'):
-            subprocess.run(["shutdown", "now"])
-        
-        if(message == 'takePicture'):
-            logger.info('taking picture')
-            await callback()
-        
         self.characteristic.value = value
         logger.info(f"Updated value to ${message}")
         
@@ -91,7 +84,3 @@ class SafePiBLEServer:
             logger.info(f"Sent to client: {msg}")
         else:
             logger.warning("No client connected; message not sent.")
-            
-    def register_callback(self, cb):
-        global callback
-        callback = cb
