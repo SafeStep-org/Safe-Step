@@ -100,27 +100,30 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             scale_x = imgL.shape[1] / small.shape[1]
             scale_y = imgL.shape[0] / small.shape[0]
 
+            scaled_boxes = []
+
             for box in results.boxes:
                 if box.conf < 0.5:
                     continue
 
-                coords = box.xyxy[0].clone()  # (x1, y1, x2, y2)
-                coords[0] *= scale_x  # x1
-                coords[1] *= scale_y  # y1
-                coords[2] *= scale_x  # x2
-                coords[3] *= scale_y  # y2
+                coords = box.xyxy[0].clone()
+                coords[0] *= scale_x
+                coords[1] *= scale_y
+                coords[2] *= scale_x
+                coords[3] *= scale_y
 
                 x1, y1, x2, y2 = map(int, coords)
                 cls_id = int(box.cls[0])
                 label = model_general.names[cls_id]
 
+                scaled_boxes.append((x1, y1, x2, y2, label))
+
                 cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(annotated_img, f"{label} {box.conf.item():.2f}", (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
+            return scaled_boxes
 
-
-            return results
 
         detection_task = asyncio.to_thread(run_yolo)
         depth_task = asyncio.to_thread(compute_depth_map, imgL, imgR)
@@ -134,15 +137,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         points_3D = cv2.reprojectImageTo3D(disparity, Q)
         detected_objects = []
 
-        for box in results.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            cls_id = int(box.cls[0])
-            label = model_general.names[cls_id]
-
-            cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(annotated_img, label, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
+        for x1, y1, x2, y2, label in results:
             region = disparity[y1:y2, x1:x2]
             mask = (region > valid_disp_min) & (region < valid_disp_max)
             if not np.any(mask):
