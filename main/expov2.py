@@ -42,8 +42,8 @@ mapRx, mapRy = cv2.initUndistortRectifyMap(mtxR, distR, R2, P2, img_size, cv2.CV
 
 stereo = cv2.StereoSGBM_create(
     minDisparity=0,
-    numDisparities=16 * 8,
-    blockSize=3,
+    numDisparities=16 * 7,
+    blockSize=5,
     P1=8 * 3 * 3 ** 2,
     P2=32 * 3 * 3 ** 2,
     disp12MaxDiff=1,
@@ -94,7 +94,7 @@ async def take_picture():
     await asyncio.sleep(0)
 
 
-# === Main Detection Loop ===
+# === Main Detection Loop with Optimizations ===
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
     while True:
@@ -111,14 +111,33 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         disparity = compute_depth_map(imgL, imgR)
         await asyncio.sleep(0)
 
-        disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
-        disp_vis = np.uint8(disp_vis)
-        disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
+        # Update disparity map display every 2 frames
+        if i % 2 == 0:
+            disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+            disp_vis = np.uint8(disp_vis)
+            disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
 
-        disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+            disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
+            fig.canvas.draw()
+            fig.canvas.flush_events()
 
+        # Annotate image with bounding boxes
+        annotated_img = imgL.copy()
+        for box in results.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            cls_id = int(box.cls[0])
+            label = model_general.names[cls_id]
+            conf = box.conf[0]
+            cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(annotated_img, f"{label} {conf:.2f}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+        # Display annotated camera feed
+        cv2.imshow("YOLO Object Detection", annotated_img)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+        # Depth estimation
         detected_objects = []
         valid_disp_min, valid_disp_max = 1, 128
         points_3D = cv2.reprojectImageTo3D(disparity, Q)
@@ -146,7 +165,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             if 0 < distance_cm < 5000:
                 detected_objects.append({"label": label, "distance_cm": distance_cm})
 
-        # Fallback to closest pixel
+        # Fallback to closest disparity pixel
         if not detected_objects:
             print("No YOLO detections, checking closest disparity pixel...")
             mask_valid = (disparity > valid_disp_min) & (disparity < valid_disp_max)
@@ -182,7 +201,6 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         await asyncio.sleep(0)
         i += 1
 
-
 # === Main Entrypoint ===
 async def main():
     try:
@@ -197,6 +215,7 @@ async def main():
         camera1.stop()
         camera2.stop()
         ser.close()
+        cv2.destroyAllWindows()
         print("Cameras and LiDAR stopped.")
 
 if __name__ == "__main__":
