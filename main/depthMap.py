@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 from picamera2 import Picamera2
 
 # Load calibration
@@ -30,53 +29,42 @@ mapRx, mapRy = cv2.initUndistortRectifyMap(mtxR, distR, R2, P2, img_size, cv2.CV
 # StereoSGBM matcher
 stereo = cv2.StereoSGBM_create(
     minDisparity=0,
-    numDisparities=16*8,  # more disparities
-    blockSize=3,          # smaller blocks
-    P1=8 * 3 * 3**2,
-    P2=32 * 3 * 3**2,
-    disp12MaxDiff=1,      # left-right check
-    uniquenessRatio=10,   # better matching
-    speckleWindowSize=100,
-    speckleRange=2,
-    preFilterCap=63,
+    numDisparities=16*5,   # must be divisible by 16
+    blockSize=5,
+    P1=8 * 3 * 5 ** 2,
+    P2=32 * 3 * 5 ** 2,
     mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY
 )
 
-print("Starting live depth map... (Press CTRL+C to stop)")
+print("Starting live depth map...")
 
-# Setup matplotlib interactive plot
-plt.ion()
-fig, ax = plt.subplots(figsize=(8, 6))
-im = ax.imshow(np.zeros((img_size[1], img_size[0], 3), dtype=np.uint8))
-plt.axis('off')
+while True:
+    imgL = camL.capture_array()
+    imgR = camR.capture_array()
 
-try:
-    while True:
-        imgL = camL.capture_array()
-        imgR = camR.capture_array()
+    # Rectify
+    rectL = cv2.remap(imgL, mapLx, mapLy, cv2.INTER_LINEAR)
+    rectR = cv2.remap(imgR, mapRx, mapRy, cv2.INTER_LINEAR)
 
-        rectL = cv2.remap(imgL, mapLx, mapLy, cv2.INTER_LINEAR)
-        rectR = cv2.remap(imgR, mapRx, mapRy, cv2.INTER_LINEAR)
+    grayL = cv2.cvtColor(rectL, cv2.COLOR_BGR2GRAY)
+    grayR = cv2.cvtColor(rectR, cv2.COLOR_BGR2GRAY)
 
-        grayL = cv2.cvtColor(rectL, cv2.COLOR_BGR2GRAY)
-        grayR = cv2.cvtColor(rectR, cv2.COLOR_BGR2GRAY)
+    # Compute disparity
+    disparity = stereo.compute(grayL, grayR).astype(np.float32) / 16.0
 
-        disparity = stereo.compute(grayL, grayR).astype(np.float32) / 16.0
+    # Normalize disparity for visualization
+    disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+    disp_vis = np.uint8(disp_vis)
 
-        disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
-        disp_vis = np.uint8(disp_vis)
+    # Color map for better visualization
+    disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
 
-        disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
+    cv2.imshow("Disparity", disp_color)
 
-        # Update matplotlib plot
-        im.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
+        break
 
-except KeyboardInterrupt:
-    print("\nStopping...")
-
-finally:
-    camL.stop()
-    camR.stop()
-    plt.close()
+cv2.destroyAllWindows()
+camL.stop()
+camR.stop()
