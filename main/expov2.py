@@ -8,6 +8,7 @@ from ultralytics import YOLO
 import numpy as np
 import matplotlib.pyplot as plt
 import ble_server
+import atexit
 
 # === Initialize hardware ===
 print("Initializing cameras...")
@@ -55,13 +56,13 @@ stereo = cv2.StereoSGBM_create(
 )
 
 # === Setup plot ===
+# === Setup Matplotlib Display ===
 plt.ion()
-fig, ax = plt.subplots(figsize=(8, 6))
-disp_plot = ax.imshow(np.zeros((img_size[1], img_size[0], 3), dtype=np.uint8))
-fig.colorbar(disp_plot)
-ax.set_title('Disparity Map')
-ax.axis('off')
-fig.tight_layout()
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+disp_plot = ax1.imshow(np.zeros((480, 640, 3), dtype=np.uint8))
+cam_plot = ax2.imshow(np.zeros((480, 640, 3), dtype=np.uint8))
+ax1.set_title("Depth Map")
+ax2.set_title("YOLO Detections")
 
 
 # === LiDAR Reader ===
@@ -111,17 +112,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         disparity = compute_depth_map(imgL, imgR)
         await asyncio.sleep(0)
 
-        # Update disparity map display every 2 frames
-        if i % 2 == 0:
-            disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
-            disp_vis = np.uint8(disp_vis)
-            disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
-
-            disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
-            fig.canvas.draw()
-            fig.canvas.flush_events()
-
-        # Annotate image with bounding boxes
+        # Annotate the image
         annotated_img = imgL.copy()
         for box in results.boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -130,12 +121,19 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             conf = box.conf[0]
             cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(annotated_img, f"{label} {conf:.2f}", (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-        # Display annotated camera feed
-        cv2.imshow("YOLO Object Detection", annotated_img)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        # Show updated image and disparity map every 2 frames
+        if i % 2 == 0:
+            # Depth Map visualization
+            disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+            disp_vis = np.uint8(disp_vis)
+            disp_color = cv2.applyColorMap(disp_vis, cv2.COLORMAP_JET)
+
+            disp_plot.set_data(cv2.cvtColor(disp_color, cv2.COLOR_BGR2RGB))
+            cam_plot.set_data(cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB))
+            fig.canvas.draw()
+            fig.canvas.flush_events()
 
         # Depth estimation
         detected_objects = []
@@ -215,7 +213,7 @@ async def main():
         camera1.stop()
         camera2.stop()
         ser.close()
-        cv2.destroyAllWindows()
+        atexit.register(lambda: plt.close('all'))
         print("Cameras and LiDAR stopped.")
 
 if __name__ == "__main__":
