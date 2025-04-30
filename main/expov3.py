@@ -119,7 +119,12 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             detected_objects = []
 
             for box in results.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                # Clone to avoid in-place update on inference-mode tensors
+                coords = box.xyxy[0].clone()
+                coords[[0, 2]] *= scale_x
+                coords[[1, 3]] *= scale_y
+
+                x1, y1, x2, y2 = map(int, coords)
                 cls_id = int(box.cls[0])
                 label = model_general.names[cls_id]
 
@@ -127,23 +132,6 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                 cv2.putText(annotated_img, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                region = disparity[y1:y2, x1:x2]
-                mask = (region > valid_disp_min) & (region < valid_disp_max)
-                if not np.any(mask):
-                    continue
-
-                median_disp = np.median(region[mask])
-                if median_disp <= 0:
-                    continue
-
-                temp_disp_map = np.full_like(disparity, median_disp)
-                points_median = cv2.reprojectImageTo3D(temp_disp_map, Q)
-                center_x = (x1 + x2) // 2
-                center_y = (y1 + y2) // 2
-                distance_cm = points_median[center_y, center_x][2] * 100
-
-                if 0 < distance_cm < 5000:
-                    detected_objects.append({"label": label, "distance_cm": distance_cm})
 
             if not detected_objects:
                 print("No YOLO detections, checking closest disparity pixel...")
