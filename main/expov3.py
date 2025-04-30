@@ -25,7 +25,7 @@ print("Initializing TF-Luna LiDAR...")
 ser = serial.Serial("/dev/ttyAMA0", 115200)
 
 print("Loading YOLO model...")
-model_general = YOLO("yolo11s.pt")  # Single YOLO model for general detection
+model_general = YOLO("yolo11n.pt")  # Single YOLO model for general detection
 
 # === Stereo Calibration ===
 calib = np.load("stereo_calib_data.npz")
@@ -94,24 +94,24 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
 
         # === Run YOLO and depth map in parallel ===
         async def run_yolo():
-            small = cv2.resize(imgL_rgb, (416, 416))
+            small = cv2.resize(imgL_rgb, (320, 320))
             results = model_general(small)[0]
             # Scale boxes back to original resolution
             scale_x = imgL.shape[1] / 416
             scale_y = imgL.shape[0] / 416
             for box in results.boxes:
-                # Clone to avoid in-place update on inference-mode tensors
+                if box.conf < 0.5:  # Set your confidence threshold here (e.g., 0.5)
+                    continue
                 coords = box.xyxy[0].clone()
                 coords[[0, 2]] *= scale_x
                 coords[[1, 3]] *= scale_y
-
                 x1, y1, x2, y2 = map(int, coords)
                 cls_id = int(box.cls[0])
                 label = model_general.names[cls_id]
-
                 cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(annotated_img, label, (x1, y1 - 10),
+                cv2.putText(annotated_img, f"{label} {box.conf.item():.2f}", (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
 
             return results
 
