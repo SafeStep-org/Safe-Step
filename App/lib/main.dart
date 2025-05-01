@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'ble_manager.dart';
 import 'tts_manager.dart';
+import 'wheelchair_manager.dart';
 import 'connect.dart';
 import 'settings.dart';
 import 'map.dart';
@@ -19,6 +20,7 @@ void main() {
         Provider<TtsManager>.value(
           value: TtsManager(),
         ),
+        ChangeNotifierProvider(create: (_) => WheelchairRoutingModel()),
       ],
       child: const SafeStepApp(),
     ),
