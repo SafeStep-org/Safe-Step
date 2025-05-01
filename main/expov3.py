@@ -156,7 +156,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             center_y = (y1 + y2) // 2
             distance_cm = points_median[center_y, center_x][2] * 100
 
-            if 0 < distance_cm < 5000:
+            if 0 < distance_cm < 10000:
                 direction = "ahead"
                 center_x = (x1 + x2) // 2
                 frame_center_x = imgL.shape[1] // 2
