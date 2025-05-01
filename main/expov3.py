@@ -205,9 +205,15 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             if should_report:
                 direction = closest_object.get("direction", "ahead")
                 print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm to the {direction}")
-                await server.send_message(
-                    f"{closest_object['label']} {direction}, {closest_object['distance_cm'] / 100:.1f} meters away"
-                )
+                current_time = time.time()
+                if not hasattr(capture_and_detect, "last_sent_time"):
+                    capture_and_detect.last_sent_time = 0
+
+                if current_time - capture_and_detect.last_sent_time >= 5:
+                    await server.send_message(
+                        f"{closest_object['label']} {direction}, {closest_object['distance_cm'] / 100:.1f} meters away"
+                    )
+                    capture_and_detect.last_sent_time = current_time
                 
                 asyncio.sleep(0)
 
