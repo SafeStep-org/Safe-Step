@@ -65,6 +65,9 @@ class SafePiBLEServer:
         logger.info(f">>>> write_request triggered!")
         logger.info(f"Received from client: {message}")
         
+        if(message == "shutdown"):
+            subprocess.run(["sudo", "shutdown", "now"])
+        
         self.characteristic.value = value
         logger.info(f"Updated value to ${message}")
         
