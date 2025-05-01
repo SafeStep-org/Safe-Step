@@ -82,6 +82,9 @@ def compute_depth_map(imgL, imgR):
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
     valid_disp_min, valid_disp_max = 1, 128
+    last_reported_label = None
+    last_reported_distance = None  # in cm
+    distance_threshold = 100  # Report again only if at least 1 meter closer
 
     while True:
         print(f"\n--- Frame {i} ---")
@@ -153,8 +156,22 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             center_y = (y1 + y2) // 2
             distance_cm = points_median[center_y, center_x][2] * 100
 
-            if 0 < distance_cm < 5000:
-                detected_objects.append({"label": label, "distance_cm": distance_cm})
+            if 0 < distance_cm < 10000:
+                direction = "ahead"
+                center_x = (x1 + x2) // 2
+                frame_center_x = imgL.shape[1] // 2
+                
+                if center_x < frame_center_x - imgL.shape[1] * 0.2:
+                    direction = "to the left"
+                elif center_x > frame_center_x + imgL.shape[1] * 0.2:
+                    direction = "to the right"
+                
+                detected_objects.append({
+                    "label": label,
+                    "distance_cm": distance_cm,
+                    "direction": direction
+                })
+
 
         if not detected_objects:
             print("No YOLO detections, checking closest disparity pixel...")
@@ -178,8 +195,25 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                     print(f"LiDAR discrepancy ({lidar_distance} cm), overriding.")
                     closest_object["distance_cm"] = lidar_distance
 
-            print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm")
-            await server.send_message(f"{closest_object['label']} found {closest_object['distance_cm'] / 100:.1f} meters away")
+            should_report = False
+            if (last_reported_label != closest_object["label"]):
+                should_report = True
+            elif (last_reported_distance is not None and
+                  last_reported_distance - closest_object["distance_cm"] >= distance_threshold):
+                should_report = True
+
+            if should_report:
+                direction = closest_object.get("direction", "ahead")
+                print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm to the {direction}")
+                await server.send_message(
+                    f"{closest_object['label']} {direction}, {closest_object['distance_cm'] / 100:.1f} meters away"
+                )
+
+                last_reported_label = closest_object["label"]
+                last_reported_distance = closest_object["distance_cm"]
+            else:
+                print(f"→ {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm (not reported)")
+
 
         # === Show updated frames with OpenCV ===
         cv2.imshow("YOLO Detection", annotated_img)
