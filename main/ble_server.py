@@ -60,7 +60,7 @@ class SafePiBLEServer:
         logger.debug(f"Reading {characteristic.value}")
         return characteristic.value
 
-    async def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
+    def write_request(self, characteristic: BlessGATTCharacteristic, value: bytearray, **kwargs):
         message = value.decode('utf-8')
         logger.info(f">>>> write_request triggered!")
         logger.info(f"Received from client: {message}")
@@ -70,8 +70,6 @@ class SafePiBLEServer:
         
         self.characteristic.value = value
         logger.info(f"Updated value to ${message}")
-        
-        await asyncio.sleep(0)
         
         if self.trigger .__module__ == "threading":
             self.trigger.set()
