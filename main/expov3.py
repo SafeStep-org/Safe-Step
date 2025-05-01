@@ -203,10 +203,12 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                 should_report = True
 
             if should_report:
-                print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm {closest_object['direction']}")
+                direction = closest_object.get("direction", "ahead")
+                print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm to the {direction}")
                 await server.send_message(
-                    f"{closest_object['label']} {closest_object['direction']}, {closest_object['distance_cm'] / 100:.1f} meters away"
+                    f"{closest_object['label']} {direction}, {closest_object['distance_cm'] / 100:.1f} meters away"
                 )
+
                 last_reported_label = closest_object["label"]
                 last_reported_distance = closest_object["distance_cm"]
             else:
