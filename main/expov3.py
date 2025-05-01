@@ -209,7 +209,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                 if not hasattr(capture_and_detect, "last_sent_time"):
                     capture_and_detect.last_sent_time = 0
 
-                if current_time - capture_and_detect.last_sent_time >= 5:
+                if current_time - capture_and_detect.last_sent_time >= 3:
                     await server.send_message(
                         f"{closest_object['label']} {direction}, {closest_object['distance_cm'] / 100:.1f} meters away"
                     )
