@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'tts_manager.dart';
+import 'wheelchair_manager.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -19,6 +20,8 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late TtsManager _ttsManager;
+  late WheelchairManager _wcManager;
+
   final Map<String, LatLng> presetDestinations = {
     "King Library": LatLng(39.5088, -84.7380),
     "McVey Data Science Building": LatLng(39.5113889, -84.7338886),
@@ -46,6 +49,7 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     myPoint = defaultPoint;
     _ttsManager = TtsManager();
+    _wcManager = WheelchairManager();
 
     super.initState();
     _initializeLocation();
@@ -166,9 +170,9 @@ class _MapScreenState extends State<MapScreen> {
 
     const apiKey = '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77';
 
-    final useWheelchair = Provider.of<WheelchairRoutingModel>(context, listen: false).isEnabled;
+    final useWheelchair = _wcManager.wheelChairDirections;
 
-    final profile = useWheelchair ? 'wheelchair' : 'foot-walking';
+    final profile = (useWheelchair ?? false) ? 'wheelchair' : 'foot-walking';
 
     final url = Uri.parse(
       'https://api.openrouteservice.org/v2/directions/$profile/geojson',

@@ -1,10 +1,8 @@
-class WheelchairRoutingModel extends ChangeNotifier {
-  bool _enabled = false;
 
-  bool get isEnabled => _enabled;
+class WheelchairManager {
+  bool? wheelChairDirections = false;
 
-  void setEnabled(bool value) {
-    _enabled = value;
-    notifyListeners();
+  void setWheelChairDirections(bool? newState) {
+    wheelChairDirections = newState;
   }
 }

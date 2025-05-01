@@ -14,13 +14,9 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        Provider<BleManager>.value(
-          value: BleManager(),
-        ),
-        Provider<TtsManager>.value(
-          value: TtsManager(),
-        ),
-        ChangeNotifierProvider(create: (_) => WheelchairRoutingModel()),
+        Provider<BleManager>.value(value: BleManager()),
+        Provider<TtsManager>.value(value: TtsManager()),
+        Provider<WheelchairManager>.value(value: WheelchairManager()),
       ],
       child: const SafeStepApp(),
     ),
@@ -35,7 +31,9 @@ class SafeStepApp extends StatelessWidget {
     return MaterialApp(
       title: 'Safe Step',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(172, 0, 204, 255))
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color.fromARGB(172, 0, 204, 255),
+        ),
       ),
       home: const MainPage(),
     );
@@ -52,11 +50,7 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    Connect(),
-    MapScreen(),
-    Settings(),
-  ];
+  final List<Widget> _pages = [Connect(), MapScreen(), Settings()];
 
   void _onTabTapped(int index) {
     setState(() {
@@ -71,10 +65,7 @@ class _MainPageState extends State<MainPage> {
         title: const Text('Safe Step'),
         backgroundColor: Theme.of(context).primaryColor,
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTabTapped,
@@ -83,10 +74,7 @@ class _MainPageState extends State<MainPage> {
             icon: Icon(Icons.bluetooth),
             label: 'Connect',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Settings',
