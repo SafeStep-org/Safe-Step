@@ -25,7 +25,7 @@ class _MapScreenState extends State<MapScreen> {
     "Western Dining Hall": LatLng(39.504586012616755, -84.72809886040675),
   };
 
-  String? selectedDestination; // Track selected destination
+  String? selectedDestination;
 
   final defaultPoint = LatLng(39.5073, -84.7452); // Oxford, OH
   late LatLng myPoint;
@@ -39,11 +39,14 @@ class _MapScreenState extends State<MapScreen> {
   LatLng? currentUserLocation;
   Timer? locationUpdateTimer;
 
-  List<dynamic> steps = []; // Add this to hold the step-by-step directions
+  List<dynamic> steps = [];
+  String lastDirection = "";
 
   @override
   void initState() {
     myPoint = defaultPoint;
+    _ttsManager = TtsManager();
+
     super.initState();
     _initializeLocation();
   }
@@ -123,83 +126,100 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       // Check if the user is near a turn step
-      if (steps.isNotEmpty) {
+      if (steps.isNotEmpty && points.isNotEmpty) {
         for (var step in steps) {
-          final stepLocation = LatLng(step['location'][1], step['location'][0]);
-          double distanceToTurn = const Distance().as(LengthUnit.Meter, newLocation, stepLocation);
-  
-          // If within 50 meters of the turn, show the instruction
-          if (distanceToTurn <= 50) {
-            print('Next turn: ${step['instruction']} in ${step['distance']} meters');
-            // You can display this instruction on your UI, e.g., show a dialog, update a label, etc.
+          final stepLocation = LatLng(
+            points[step['way_points'][0]].latitude,
+            points[step['way_points'][0]].longitude,
+          );
+          double distanceToTurn = const Distance().as(
+            LengthUnit.Meter,
+            newLocation,
+            stepLocation,
+          );
+
+          if (distanceToTurn <= 10) {
+            String instruction = step["instruction"];
+            String distance = step["distance"].toString();
+
+            String direction = "$instruction $distance meters";
+
+            if (direction != lastDirection) {
+              _ttsManager.speakImportant(direction);
+            }
+
+            lastDirection = direction;
           }
         }
       }
     });
   }
 
-  // Define this model globally to store instructions
   List<String> navigationInstructions = [];
 
   Future<void> getCoordinates(LatLng start, LatLng end) async {
     if (!mounted) return;
-  
+
     setState(() {
       isLoading = true;
     });
-  
-    const apiKey = '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77'; // Replace with your OpenRouteService API key
-  
-    final url = Uri.parse('https://api.openrouteservice.org/v2/directions/foot-walking/geojson');
-  
+
+    const apiKey = '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77';
+
+    final url = Uri.parse(
+      'https://api.openrouteservice.org/v2/directions/foot-walking/geojson',
+    );
+
     final body = jsonEncode({
       "coordinates": [
-        [start.longitude, start.latitude], // OpenRouteService expects [lng, lat]!
-        [end.longitude, end.latitude]
+        [start.longitude, start.latitude],
+        [end.longitude, end.latitude],
       ],
     });
-  
+
     final response = await http.post(
       url,
-      headers: {
-        'Authorization': apiKey,
-        'Content-Type': 'application/json',
-      },
+      headers: {'Authorization': apiKey, 'Content-Type': 'application/json'},
       body: body,
     );
-  
+
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-  
-      // Extract route coordinates
+
       final coords = data['features'][0]['geometry']['coordinates'] as List;
-  
-      final List<LatLng> routePoints = coords.map<LatLng>((coord) {
-        return LatLng(coord[1], coord[0]); // Reverse [lng, lat] -> [lat, lng]
-      }).toList();
-  
-      // Extract navigation instructions
-      final stepsFromResponse = data['features'][0]['properties']['segments'][0]['steps'] as List;
+
+      List<LatLng> routePoints = [];
+      if (points.isEmpty) {
+        routePoints =
+            coords.map<LatLng>((coord) {
+              return LatLng(coord[1], coord[0]);
+            }).toList();
+      }
+
+      final stepsFromResponse =
+          data['features'][0]['properties']['segments'][0]['steps'] as List;
       steps = stepsFromResponse;
 
-      navigationInstructions = stepsFromResponse.map<String>((step) {
-        final instruction = step['instruction'];
-        final distance = step['distance'];
-        return '$instruction in ${distance.toStringAsFixed(0)} meters';
-      }).toList();
-  
+      navigationInstructions =
+          stepsFromResponse.map<String>((step) {
+            final instruction = step['instruction'];
+            final distance = step['distance'];
+            return '$instruction in ${distance.toStringAsFixed(0)} meters';
+          }).toList();
+
       if (!mounted) return;
-  
+
       setState(() {
-        points = routePoints;
+        if(routePoints.isNotEmpty) {
+          points = routePoints;
+        }
+        
         isLoading = false;
       });
-  
-      // For debugging, you could print instructions
+
       for (var instr in navigationInstructions) {
         print(instr);
       }
-  
     } else {
       if (!mounted) return;
       setState(() {
@@ -222,10 +242,7 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           FlutterMap(
             mapController: mapController,
-            options: MapOptions(
-              initialZoom: 16,
-              initialCenter: myPoint,
-            ),
+            options: MapOptions(initialZoom: 16, initialCenter: myPoint),
             children: [
               TileLayer(
                 urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
