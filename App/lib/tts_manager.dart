@@ -12,7 +12,8 @@ class TtsManager {
   }
 
   void speakImportant(String text) async {
-    flutterTts.stop();
+    await flutterTts.stop();
+    print("speaking $text");
     await flutterTts.speak(text);
   }
 

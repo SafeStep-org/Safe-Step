@@ -44,6 +44,7 @@ class _MapScreenState extends State<MapScreen> {
 
   List<dynamic> steps = [];
   String lastDirection = "";
+  bool spokeFirst = false;
 
   @override
   void initState() {
@@ -132,6 +133,10 @@ class _MapScreenState extends State<MapScreen> {
       // Check if the user is near a turn step
       if (steps.isNotEmpty && points.isNotEmpty) {
         for (var step in steps) {
+          if(step == steps[0]) {
+            continue;
+          }
+
           final stepLocation = LatLng(
             points[step['way_points'][0]].latitude,
             points[step['way_points'][0]].longitude,
@@ -142,7 +147,7 @@ class _MapScreenState extends State<MapScreen> {
             stepLocation,
           );
 
-          if (distanceToTurn <= 10) {
+          if (distanceToTurn <= 5) {
             String instruction = step["instruction"];
             String distance = step["distance"].toString();
 
@@ -196,37 +201,40 @@ class _MapScreenState extends State<MapScreen> {
 
       final coords = data['features'][0]['geometry']['coordinates'] as List;
 
-      List<LatLng> routePoints = [];
       if (points.isEmpty) {
-        routePoints =
-            coords.map<LatLng>((coord) {
-              return LatLng(coord[1], coord[0]);
-            }).toList();
-      }
-
-      final stepsFromResponse =
-          data['features'][0]['properties']['segments'][0]['steps'] as List;
-      steps = stepsFromResponse;
-
-      navigationInstructions =
-          stepsFromResponse.map<String>((step) {
-            final instruction = step['instruction'];
-            final distance = step['distance'];
-            return '$instruction in ${distance.toStringAsFixed(0)} meters';
-          }).toList();
-
-      if (!mounted) return;
-
-      setState(() {
-        if(routePoints.isNotEmpty) {
-          points = routePoints;
+        List<LatLng> routePoints = [];
+        if (points.isEmpty) {
+          routePoints =
+              coords.map<LatLng>((coord) {
+                return LatLng(coord[1], coord[0]);
+              }).toList();
         }
-        
-        isLoading = false;
-      });
 
-      for (var instr in navigationInstructions) {
-        print(instr);
+        final stepsFromResponse =
+            data['features'][0]['properties']['segments'][0]['steps'] as List;
+        steps = stepsFromResponse;
+
+        navigationInstructions =
+            stepsFromResponse.map<String>((step) {
+              final instruction = step['instruction'];
+              final distance = step['distance'];
+              return '$instruction in ${distance.toStringAsFixed(0)} meters';
+            }).toList();
+
+        if (!mounted) return;
+
+        setState(() {
+          if (routePoints.isNotEmpty) {
+            points = routePoints;
+          }
+
+          isLoading = false;
+        });
+
+        if(navigationInstructions.isNotEmpty) {
+          _ttsManager.speakImportant(navigationInstructions[0]);
+          spokeFirst = true;
+        }
       }
     } else {
       if (!mounted) return;

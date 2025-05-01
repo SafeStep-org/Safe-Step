@@ -27,23 +27,28 @@ class SettingsState extends State<Settings> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ElevatedButton(onPressed: _shutDown, child: Text("Shutdown SafeStep")),
-        const SizedBox(height: 20),
-        Text("Accessibility Settings", style: Theme.of(context).textTheme.titleMedium),
-        CheckboxListTile(
-          title: const Text("Wheelchair Routing"),
-          value: _wcManager.wheelChairDirections,
-          onChanged: (bool? value) {
-            setState(() {
-              _wcManager.setWheelChairDirections(value);
-            });
-            // Save to Provider or local state
-          },
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Accessibility Settings", style: TextStyle(fontSize: 20)),
+          CheckboxListTile(
+            title: const Text("Wheelchair Routing"),
+            value: _wcManager.wheelChairDirections,
+            onChanged: (bool? value) {
+              setState(() {
+                _wcManager.setWheelChairDirections(value);
+              });
+            },
+          ),
+          ElevatedButton(
+            onPressed: _shutDown,
+            child: Text("Shutdown SafeStep"),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 }
