@@ -157,7 +157,21 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             distance_cm = points_median[center_y, center_x][2] * 100
 
             if 0 < distance_cm < 5000:
-                detected_objects.append({"label": label, "distance_cm": distance_cm})
+                direction = "ahead"
+                center_x = (x1 + x2) // 2
+                frame_center_x = imgL.shape[1] // 2
+                
+                if center_x < frame_center_x - imgL.shape[1] * 0.2:
+                    direction = "to the left"
+                elif center_x > frame_center_x + imgL.shape[1] * 0.2:
+                    direction = "to the right"
+                
+                detected_objects.append({
+                    "label": label,
+                    "distance_cm": distance_cm,
+                    "direction": direction
+                })
+
 
         if not detected_objects:
             print("No YOLO detections, checking closest disparity pixel...")
@@ -189,9 +203,9 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                 should_report = True
 
             if should_report:
-                print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm")
+                print(f"→ Closest: {closest_object['label']} @ {closest_object['distance_cm']:.1f} cm {closest_object["direction"]}")
                 await server.send_message(
-                    f"{closest_object['label']} found {closest_object['distance_cm'] / 100:.1f} meters away"
+                    f"{closest_object['label']} {closest_object["direction"]}, {closest_object['distance_cm'] / 100:.1f} meters away"
                 )
                 last_reported_label = closest_object["label"]
                 last_reported_distance = closest_object["distance_cm"]
