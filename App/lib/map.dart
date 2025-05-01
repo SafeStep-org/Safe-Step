@@ -166,8 +166,12 @@ class _MapScreenState extends State<MapScreen> {
 
     const apiKey = '5b3ce3597851110001cf6248afaea8a79e6d4f7891520a594e9fbf77';
 
+    final useWheelchair = Provider.of<WheelchairRoutingModel>(context, listen: false).isEnabled;
+
+    final profile = useWheelchair ? 'wheelchair' : 'foot-walking';
+
     final url = Uri.parse(
-      'https://api.openrouteservice.org/v2/directions/foot-walking/geojson',
+      'https://api.openrouteservice.org/v2/directions/$profile/geojson',
     );
 
     final body = jsonEncode({

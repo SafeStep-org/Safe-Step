@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-
-import 'package:safe_step/ble_manager.dart';
 import 'package:provider/provider.dart';
+import 'package:safe_step/ble_manager.dart';
 import 'package:safe_step/tts_manager.dart';
 
 class Settings extends StatefulWidget {
@@ -13,6 +12,8 @@ class Settings extends StatefulWidget {
 class SettingsState extends State<Settings> {
   late BleManager _bleManager;
   late TtsManager _ttsManager;
+
+  bool _wheelchairRouting = false;
 
   @override
   void initState() {
@@ -31,6 +32,19 @@ class SettingsState extends State<Settings> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ElevatedButton(onPressed: _shutDown, child: Text("Shutdown SafeStep")),
+        const SizedBox(height: 20),
+        Text("Accessibility Settings", style: Theme.of(context).textTheme.titleMedium),
+        CheckboxListTile(
+          title: const Text("Wheelchair Routing"),
+          value: _wheelchairRouting,
+          onChanged: (bool? value) {
+            setState(() {
+              _wheelchairRouting = value ?? false;
+            });
+            // Save to Provider or local state
+            context.read<WheelchairRoutingModel>().setEnabled(_wheelchairRouting);
+          },
+        ),
       ],
     );
   }
