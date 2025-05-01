@@ -103,7 +103,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             scaled_boxes = []
 
             for box in results.boxes:
-                if box.conf < 0.5:
+                if box.conf < 0.7:
                     continue
 
                 coords = box.xyxy[0].clone()

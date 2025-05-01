@@ -139,11 +139,6 @@ def get_object_distance(bbox, disparity_map, Q):
     else:
         return None
     
-async def take_picture():
-    img = camera1.capture_array()
-    cv2.imwrite(f'pictures/{time.time()}.jpg', img)
-    await asyncio.sleep(0)
-    
 def get_direction(x_center, image_width):
     if x_center < image_width / 3:
         return "left"
@@ -290,10 +285,8 @@ async def main():
     try:
         loop = asyncio.get_running_loop()
         server = ble_server.SafePiBLEServer(loop)
-
-        server.register_callback(take_picture)        
+        
         await server.start()
-                 
         await capture_and_detect(server)
     except KeyboardInterrupt:
         print("\nStopping program...")
