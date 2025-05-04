@@ -27,6 +27,13 @@ ser = serial.Serial("/dev/ttyAMA0", 115200)
 print("Loading YOLO model...")
 model_general = YOLO("yolo11n.pt")  # Single YOLO model for general detection
 
+# === Crosswalk Detection Model ===
+CROSSWALK_MODEL_PATH = "Crosswalks_ONNX_Model.onnx"
+CROSSWALK_INPUT_SIZE = 512
+CROSSWALK_CONF_THRESHOLD = 0.3
+
+crosswalk_net = cv2.dnn.readNetFromONNX(CROSSWALK_MODEL_PATH)
+
 # === Stereo Calibration ===
 calib = np.load("stereo_calib_data.npz")
 mtxL, distL = calib['mtxL'], calib['distL']
@@ -78,6 +85,25 @@ def compute_depth_map(imgL, imgR):
     disparity = stereo.compute(grayL, grayR).astype(np.float32) / 16.0
     return disparity
 
+def detect_crosswalk(img):
+    # Preprocess
+    blob = cv2.dnn.blobFromImage(img, scalefactor=1/255.0, size=(CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE), mean=(0, 0, 0), swapRB=True, crop=False)
+    crosswalk_net.setInput(blob)
+    output = crosswalk_net.forward()
+
+    # Assuming output shape is (1, N, 6): [x1, y1, x2, y2, conf, class_id]
+    detected = []
+    if len(output.shape) == 3:
+        for det in output[0]:
+            x1, y1, x2, y2, conf, cls = det
+            if conf > CROSSWALK_CONF_THRESHOLD:
+                x1 = int(x1 * img.shape[1])
+                y1 = int(y1 * img.shape[0])
+                x2 = int(x2 * img.shape[1])
+                y2 = int(y2 * img.shape[0])
+                detected.append((x1, y1, x2, y2, conf))
+    return detected
+
 # === Main Detection Loop with Optimizations ===
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
     i = 0
@@ -128,10 +154,16 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             return scaled_boxes
 
 
+        async def run_crosswalk():
+            resized = cv2.resize(imgL, (CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE))
+            return detect_crosswalk(resized)
+
         detection_task = asyncio.to_thread(run_yolo)
         depth_task = asyncio.to_thread(compute_depth_map, imgL, imgR)
-        results, disparity = await asyncio.gather(detection_task, depth_task)
-        results = await results  # nested coroutine
+        crosswalk_task = asyncio.to_thread(run_crosswalk)
+        
+        results, disparity, crosswalks = await asyncio.gather(detection_task, depth_task, crosswalk_task)
+        results = await results
 
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         disp_vis = np.uint8(disp_vis)
@@ -139,6 +171,42 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
 
         points_3D = cv2.reprojectImageTo3D(disparity, Q)
         detected_objects = []
+
+        for x1, y1, x2, y2, conf in crosswalks:
+            # Treat crosswalk like any other label
+            region = disparity[y1:y2, x1:x2]
+            mask = (region > valid_disp_min) & (region < valid_disp_max)
+            if not np.any(mask):
+                continue
+        
+            median_disp = np.median(region[mask])
+            if median_disp <= 0:
+                continue
+        
+            temp_disp_map = np.full_like(disparity, median_disp)
+            points_median = cv2.reprojectImageTo3D(temp_disp_map, Q)
+            center_x = (x1 + x2) // 2
+            center_y = (y1 + y2) // 2
+            distance_cm = points_median[center_y, center_x][2] * 100
+        
+            direction = "ahead"
+            frame_center_x = imgL.shape[1] // 2
+            if center_x < frame_center_x - imgL.shape[1] * 0.2:
+                direction = "to the left"
+            elif center_x > frame_center_x + imgL.shape[1] * 0.2:
+                direction = "to the right"
+        
+            detected_objects.append({
+                "label": "crosswalk",
+                "distance_cm": distance_cm,
+                "direction": direction
+            })
+        
+            # Optional: Draw rectangle
+            cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (255, 255, 0), 2)
+            cv2.putText(annotated_img, f"Crosswalk {conf:.2f}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+
 
         for x1, y1, x2, y2, label in results:
             region = disparity[y1:y2, x1:x2]
