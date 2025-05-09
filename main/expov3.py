@@ -32,8 +32,6 @@ CROSSWALK_MODEL_PATH = "Crosswalks_ONNX_Model.onnx"
 CROSSWALK_INPUT_SIZE = 512
 CROSSWALK_CONF_THRESHOLD = 0.3
 
-crosswalk_net = cv2.dnn.readNetFromONNX(CROSSWALK_MODEL_PATH)
-
 # === Stereo Calibration ===
 calib = np.load("stereo_calib_data.npz")
 mtxL, distL = calib['mtxL'], calib['distL']
@@ -86,37 +84,34 @@ def compute_depth_map(imgL, imgR):
     return disparity
 
 def detect_crosswalk(img):
-    # Resize and preprocess image
+    net = cv2.dnn.readNetFromONNX(CROSSWALK_MODEL_PATH)
+
     img_resized = cv2.resize(img, (CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE))
     blob = cv2.dnn.blobFromImage(img_resized, scalefactor=1/255.0, size=(CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE), swapRB=True, crop=False)
-    crosswalk_net.setInput(blob)
+    net.setInput(blob)
 
-    # Forward pass
-    output = crosswalk_net.forward()
-    output = output.squeeze().transpose(1, 0)  # Shape (5376, 5)
+    output = net.forward()
+    output = output.squeeze().transpose(1, 0)
 
-    # Original image dimensions
     h_orig, w_orig = img.shape[:2]
-
     detections = []
     for det in output:
         x, y, w, h, conf = det
         if conf < CROSSWALK_CONF_THRESHOLD:
             continue
 
-        # Convert from center x/y + width/height to corner coordinates
         x1 = int((x - w / 2) * w_orig / CROSSWALK_INPUT_SIZE)
         y1 = int((y - h / 2) * h_orig / CROSSWALK_INPUT_SIZE)
         x2 = int((x + w / 2) * w_orig / CROSSWALK_INPUT_SIZE)
         y2 = int((y + h / 2) * h_orig / CROSSWALK_INPUT_SIZE)
 
-        # Clamp coordinates to image bounds
         x1, y1 = max(x1, 0), max(y1, 0)
         x2, y2 = min(x2, w_orig - 1), min(y2, h_orig - 1)
 
         detections.append((x1, y1, x2, y2, conf))
 
     return detections
+
 
 # === Main Detection Loop with Optimizations ===
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
