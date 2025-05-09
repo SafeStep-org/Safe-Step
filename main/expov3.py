@@ -86,23 +86,37 @@ def compute_depth_map(imgL, imgR):
     return disparity
 
 def detect_crosswalk(img):
-    # Preprocess
-    blob = cv2.dnn.blobFromImage(img, scalefactor=1/255.0, size=(CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE), mean=(0, 0, 0), swapRB=True, crop=False)
+    # Resize and preprocess image
+    img_resized = cv2.resize(img, (CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE))
+    blob = cv2.dnn.blobFromImage(img_resized, scalefactor=1/255.0, size=(CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE), swapRB=True, crop=False)
     crosswalk_net.setInput(blob)
-    output = crosswalk_net.forward()
 
-    # Assuming output shape is (1, N, 6): [x1, y1, x2, y2, conf, class_id]
-    detected = []
-    if len(output.shape) == 3:
-        for det in output[0]:
-            x1, y1, x2, y2, conf, cls = det
-            if conf > CROSSWALK_CONF_THRESHOLD:
-                x1 = int(x1 * img.shape[1])
-                y1 = int(y1 * img.shape[0])
-                x2 = int(x2 * img.shape[1])
-                y2 = int(y2 * img.shape[0])
-                detected.append((x1, y1, x2, y2, conf))
-    return detected
+    # Forward pass
+    output = crosswalk_net.forward()
+    output = output.squeeze().transpose(1, 0)  # Shape (5376, 5)
+
+    # Original image dimensions
+    h_orig, w_orig = img.shape[:2]
+
+    detections = []
+    for det in output:
+        x, y, w, h, conf = det
+        if conf < CROSSWALK_CONF_THRESHOLD:
+            continue
+
+        # Convert from center x/y + width/height to corner coordinates
+        x1 = int((x - w / 2) * w_orig / CROSSWALK_INPUT_SIZE)
+        y1 = int((y - h / 2) * h_orig / CROSSWALK_INPUT_SIZE)
+        x2 = int((x + w / 2) * w_orig / CROSSWALK_INPUT_SIZE)
+        y2 = int((y + h / 2) * h_orig / CROSSWALK_INPUT_SIZE)
+
+        # Clamp coordinates to image bounds
+        x1, y1 = max(x1, 0), max(y1, 0)
+        x2, y2 = min(x2, w_orig - 1), min(y2, h_orig - 1)
+
+        detections.append((x1, y1, x2, y2, conf))
+
+    return detections
 
 # === Main Detection Loop with Optimizations ===
 async def capture_and_detect(server: ble_server.SafePiBLEServer):
@@ -155,8 +169,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
 
 
         async def run_crosswalk():
-            resized = cv2.resize(imgL, (CROSSWALK_INPUT_SIZE, CROSSWALK_INPUT_SIZE))
-            return detect_crosswalk(resized)
+            return detect_crosswalk(imgL)
 
         detection_task = asyncio.to_thread(run_yolo)
         depth_task = asyncio.to_thread(compute_depth_map, imgL, imgR)
