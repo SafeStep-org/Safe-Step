@@ -131,7 +131,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
         disp_color = np.zeros_like(imgL)
 
         # === Run YOLO and depth map in parallel ===
-        async def run_yolo():
+        def run_yolo():
             small = cv2.resize(imgL_rgb, (320, 320))
             results = model_general(small)[0]
 
@@ -163,14 +163,19 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
             return scaled_boxes
 
 
-        async def run_crosswalk():
+        def run_crosswalk():
             return detect_crosswalk(imgL)
 
         detection_task = asyncio.to_thread(run_yolo)
         depth_task = asyncio.to_thread(compute_depth_map, imgL, imgR)
         crosswalk_task = asyncio.to_thread(run_crosswalk)
         
-        results, disparity, crosswalks = await asyncio.gather(detection_task, depth_task, crosswalk_task)
+        results, disparity, crosswalks = await asyncio.gather(
+            asyncio.to_thread(run_yolo),
+            asyncio.to_thread(compute_depth_map, imgL, imgR),
+            asyncio.to_thread(run_crosswalk)
+        )
+
         results = await results
 
         disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
