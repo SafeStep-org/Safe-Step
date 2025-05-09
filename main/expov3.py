@@ -296,7 +296,7 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
                     )
                     capture_and_detect.last_sent_time = current_time
                 
-                asyncio.sleep(0)
+                await asyncio.sleep(0)
 
                 last_reported_label = closest_object["label"]
                 last_reported_distance = closest_object["distance_cm"]
@@ -305,8 +305,8 @@ async def capture_and_detect(server: ble_server.SafePiBLEServer):
 
 
         # === Show updated frames with OpenCV ===
-        cv2.imshow("YOLO Detection", annotated_img)
-        cv2.imshow("Depth Map", disp_color)
+        # cv2.imshow("YOLO Detection", annotated_img)
+        #cv2.imshow("Depth Map", disp_color)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
